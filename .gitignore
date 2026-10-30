@@ -36,3 +36,29 @@ tmp/
 temp/
 # Local Android backups
 _backup_android_*/
+
+# StudyPulse local ignores
+# Local Android backups
+_backup_android_*/
+
+# Android Studio / Gradle generated
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/.kotlin/
+android/app/.kotlin/
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/
+
+# Python backend
+backend/venv/
+backend/.venv/
+backend/studypulse.db
+backend/instance/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
