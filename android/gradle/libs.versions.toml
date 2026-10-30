@@ -1,11 +1,13 @@
 [versions]
 agp = "8.7.3"
 kotlin = "2.0.21"
+ksp = "2.0.21-1.0.28"
 
 composeBom = "2024.12.01"
 coreKtx = "1.13.1"
 activityCompose = "1.9.3"
 lifecycle = "2.8.7"
+room = "2.6.1"
 
 datastore = "1.1.1"
 retrofit = "2.11.0"
@@ -35,6 +37,10 @@ compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
@@ -56,3 +62,4 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
