@@ -34,3 +34,5 @@ Thumbs.db
 # Temporary / local
 tmp/
 temp/
+# Local Android backups
+_backup_android_*/
