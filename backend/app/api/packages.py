@@ -26,7 +26,7 @@ def _device_or_none(device_uid):
     return Device.query.filter_by(device_uid=device_uid).first()
 
 
-@packages_bp.get("/")
+@packages_bp.get("")
 def list_packages():
     device_uid = request.args.get("device_uid")
     device = _device_or_none(device_uid)
