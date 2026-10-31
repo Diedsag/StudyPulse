@@ -2,6 +2,7 @@ package com.studypulse.sync.core.network.dto
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class DeviceRegisterRequest(
@@ -193,6 +194,60 @@ data class BundleResponse(
 
     @SerialName("cards")
     val cards: List<CardDto> = emptyList(),
+
+    @SerialName("server_time")
+    val serverTime: String? = null
+)
+
+@Serializable
+data class SyncEventRequest(
+    @SerialName("client_event_id")
+    val clientEventId: String,
+
+    @SerialName("event_type")
+    val eventType: String,
+
+    @SerialName("occurred_at")
+    val occurredAt: String,
+
+    @SerialName("payload")
+    val payload: JsonElement
+)
+
+@Serializable
+data class SyncBatchRequest(
+    @SerialName("device_uid")
+    val deviceUid: String,
+
+    @SerialName("events")
+    val events: List<SyncEventRequest>
+)
+
+@Serializable
+data class SyncBatchResponse(
+    @SerialName("accepted")
+    val accepted: Int = 0,
+
+    @SerialName("duplicated")
+    val duplicated: Int = 0,
+
+    @SerialName("rejected")
+    val rejected: Int = 0,
+
+    @SerialName("xp_awarded_total")
+    val xpAwardedTotal: Int = 0,
+
+    @SerialName("total_xp")
+    val totalXp: Int = 0,
+
+    @SerialName("weekly_xp")
+    val weeklyXp: Int = 0,
+
+    @SerialName("level")
+    val level: Int = 1,
+
+    @SerialName("streak_days")
+    val streakDays: Int = 0,
 
     @SerialName("server_time")
     val serverTime: String? = null

@@ -101,14 +101,37 @@ class StudyRepository(
         templateExternalId: String,
         date: String
     ) {
-        classInstanceDao.upsert(
-            ClassInstanceEntity(
-                templateExternalId = templateExternalId,
-                date = date,
-                status = "CANCELLED",
-                updatedAt = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+
+        database.withTransaction {
+            classInstanceDao.upsert(
+                ClassInstanceEntity(
+                    templateExternalId = templateExternalId,
+                    date = date,
+                    status = "CANCELLED",
+                    updatedAt = now
+                )
             )
-        )
+
+            val clientEventId = UUID.randomUUID().toString()
+            val payloadJson = buildJsonObject {
+                put("template_external_id", templateExternalId)
+                put("date", date)
+            }.toString()
+
+            pendingEventDao.insert(
+                PendingEventEntity(
+                    clientEventId = clientEventId,
+                    eventType = "CLASS_CANCELLED",
+                    payloadJson = payloadJson,
+                    occurredAt = now,
+                    createdAt = now,
+                    retryCount = 0,
+                    lastError = null,
+                    synced = false
+                )
+            )
+        }
     }
 
     suspend fun getDueCards(
@@ -209,11 +232,41 @@ class StudyRepository(
 
     suspend fun acceptPlan(): Result<Int> {
         return try {
+            val now = System.currentTimeMillis()
+
             val count = database.withTransaction {
-                studySlotDao.updateStatus(
+                val proposed = studySlotDao.getAllByStatus("PROPOSED")
+                val updated = studySlotDao.updateStatus(
                     oldStatus = "PROPOSED",
                     newStatus = "PLANNED"
                 )
+
+                if (updated > 0) {
+                    val totalMinutes = proposed.sumOf { slot ->
+                        ((slot.endDateTime - slot.startDateTime) / 60_000L).toInt()
+                    }
+
+                    val clientEventId = UUID.randomUUID().toString()
+                    val payloadJson = buildJsonObject {
+                        put("slots_count", JsonPrimitive(updated))
+                        put("total_minutes", JsonPrimitive(totalMinutes))
+                    }.toString()
+
+                    pendingEventDao.insert(
+                        PendingEventEntity(
+                            clientEventId = clientEventId,
+                            eventType = "PLAN_ACCEPTED",
+                            payloadJson = payloadJson,
+                            occurredAt = now,
+                            createdAt = now,
+                            retryCount = 0,
+                            lastError = null,
+                            synced = false
+                        )
+                    )
+                }
+
+                updated
             }
 
             Result.success(count)

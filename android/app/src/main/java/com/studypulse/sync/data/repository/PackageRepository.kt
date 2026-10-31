@@ -1,14 +1,18 @@
 package com.studypulse.sync.data.repository
 
+import androidx.room.withTransaction
 import com.studypulse.sync.core.datastore.SettingsRepository
 import com.studypulse.sync.core.network.ApiService
 import com.studypulse.sync.core.network.dto.DeviceRegisterRequest
 import com.studypulse.sync.data.local.AppDatabase
+import com.studypulse.sync.data.local.entity.PendingEventEntity
 import com.studypulse.sync.data.local.entity.StudyPackageEntity
 import com.studypulse.sync.data.mapper.BundleMappers.toEntities
 import com.studypulse.sync.data.mapper.BundleMappers.toEntity
 import kotlinx.coroutines.flow.Flow
-import androidx.room.withTransaction
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import java.util.UUID
 
 interface PackageRepository {
 
@@ -77,6 +81,24 @@ class PackageRepositoryImpl(
                 database.taskDao().insertAll(entities.tasks)
                 database.materialDao().insertAll(entities.materials)
                 database.cardDao().insertAll(entities.cards)
+
+                val clientEventId = UUID.randomUUID().toString()
+                val payloadJson = buildJsonObject {
+                    put("package_external_id", externalId)
+                }.toString()
+
+                database.pendingEventDao().insert(
+                    PendingEventEntity(
+                        clientEventId = clientEventId,
+                        eventType = "PACKAGE_DOWNLOADED",
+                        payloadJson = payloadJson,
+                        occurredAt = now,
+                        createdAt = now,
+                        retryCount = 0,
+                        lastError = null,
+                        synced = false
+                    )
+                )
             }
 
             Result.success(Unit)

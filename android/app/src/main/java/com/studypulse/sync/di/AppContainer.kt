@@ -9,6 +9,7 @@ import com.studypulse.sync.data.local.AppDatabase
 import com.studypulse.sync.data.repository.PackageRepository
 import com.studypulse.sync.data.repository.PackageRepositoryImpl
 import com.studypulse.sync.data.repository.StudyRepository
+import com.studypulse.sync.data.repository.SyncRepository
 
 class AppContainer(context: Context) {
 
@@ -31,6 +32,13 @@ class AppContainer(context: Context) {
 
     val studyRepository: StudyRepository =
         StudyRepository(database)
+
+    val syncRepository: SyncRepository =
+        SyncRepository(
+            database = database,
+            settingsRepository = settingsRepository,
+            apiFactory = apiFactory
+        )
 
     fun apiService(baseUrl: String): ApiService =
         apiFactory(baseUrl)

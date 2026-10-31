@@ -248,4 +248,26 @@ interface PendingEventDao {
 
     @Query("SELECT COUNT(*) FROM pending_events WHERE synced = 0")
     fun observeUnsyncedCount(): Flow<Int>
+
+    @Query(
+        "SELECT * FROM pending_events " +
+            "WHERE synced = 0 " +
+            "ORDER BY occurredAt ASC " +
+            "LIMIT :limit"
+    )
+    suspend fun getUnsyncedOnce(limit: Int): List<PendingEventEntity>
+
+    @Query(
+        "UPDATE pending_events " +
+            "SET synced = 1 " +
+            "WHERE clientEventId IN (:ids)"
+    )
+    suspend fun markSynced(ids: List<String>)
+
+    @Query(
+        "UPDATE pending_events " +
+            "SET retryCount = retryCount + 1, lastError = :error " +
+            "WHERE clientEventId IN (:ids)"
+    )
+    suspend fun markFailed(ids: List<String>, error: String)
 }

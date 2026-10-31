@@ -5,6 +5,8 @@ import com.studypulse.sync.core.network.dto.DeviceRegisterRequest
 import com.studypulse.sync.core.network.dto.DeviceRegisterResponse
 import com.studypulse.sync.core.network.dto.HealthResponse
 import com.studypulse.sync.core.network.dto.PackageListResponse
+import com.studypulse.sync.core.network.dto.SyncBatchRequest
+import com.studypulse.sync.core.network.dto.SyncBatchResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -31,4 +33,9 @@ interface ApiService {
         @Path("externalId") externalId: String,
         @Query("device_uid") deviceUid: String
     ): BundleResponse
+
+    @POST("/api/sync/batch")
+    suspend fun syncBatch(
+        @Body request: SyncBatchRequest
+    ): SyncBatchResponse
 }

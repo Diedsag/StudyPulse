@@ -17,6 +17,7 @@ class Device(db.Model):
 
     total_xp = db.Column(db.Integer, default=0, nullable=False)
     weekly_xp = db.Column(db.Integer, default=0, nullable=False)
+    weekly_period_key = db.Column(db.String(20), nullable=True)
     level = db.Column(db.Integer, default=1, nullable=False)
     streak_days = db.Column(db.Integer, default=0, nullable=False)
     last_active_date = db.Column(db.Date, nullable=True)
@@ -122,3 +123,23 @@ class PackageCard(db.Model):
     back = db.Column(db.Text, nullable=False)
     hint = db.Column(db.Text, nullable=True)
     position = db.Column(db.Integer, default=0, nullable=False)
+
+
+class SyncEvent(db.Model):
+    __tablename__ = "sync_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_event_id = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    device_uid = db.Column(
+        db.String(120),
+        db.ForeignKey("devices.device_uid"),
+        nullable=False,
+        index=True,
+    )
+
+    event_type = db.Column(db.String(80), nullable=False)
+    occurred_at = db.Column(db.DateTime, nullable=False)
+    payload_json = db.Column(db.Text, nullable=False)
+    xp_awarded = db.Column(db.Integer, nullable=False, default=0)
+
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)

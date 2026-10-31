@@ -19,10 +19,12 @@ def create_app():
     from .api.health import health_bp
     from .api.devices import devices_bp
     from .api.packages import packages_bp
+    from .api.sync import sync_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(devices_bp, url_prefix="/api/devices")
     app.register_blueprint(packages_bp, url_prefix="/api/packages")
+    app.register_blueprint(sync_bp, url_prefix="/api/sync")
 
     with app.app_context():
         db.create_all()

@@ -23,12 +23,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.studypulse.sync.ui.sync.SyncViewModel
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun SettingsScreen(
-    viewModel: SettingsViewModel = viewModel()
+    viewModel: SettingsViewModel = viewModel(),
+    syncViewModel: SyncViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val syncState by syncViewModel.uiState.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -136,6 +142,60 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
+                    text = "Sync",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                Text(
+                    text = "Очередь событий: ${syncState.pendingCount}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text(
+                    text = "Последняя синхронизация: ${formatTimestamp(syncState.lastSyncAt)}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = syncViewModel::sync,
+                        enabled = !syncState.isSyncing
+                    ) {
+                        Text("Синхронизировать")
+                    }
+
+                    if (syncState.isSyncing) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                syncState.message?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                Text(
+                    text = "XP: ${syncState.totalXp}, weekly: ${syncState.weeklyXp}, " +
+                        "level: ${syncState.level}, streak: ${syncState.streakDays}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
                     text = "Hint",
                     style = MaterialTheme.typography.titleMedium
                 )
@@ -149,5 +209,19 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+}
+
+private fun formatTimestamp(value: Long?): String {
+    if (value == null) return "—"
+
+    return try {
+        Instant
+            .ofEpochMilli(value)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDateTime()
+            .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+    } catch (_: Throwable) {
+        "—"
     }
 }
