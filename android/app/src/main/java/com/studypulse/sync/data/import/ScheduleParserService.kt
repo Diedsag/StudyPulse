@@ -74,37 +74,48 @@ class ScheduleParserService {
                 if (start == null || end == null) continue
                 if (!isValidTimeRange(start, end)) continue
 
-                // Убираем время из строки для поиска остальных полей
-                val rest = line.replace(timeMatch.value, "").trim().trim(',', '.', '-')
+                // Убираем время из строки
+                var rest = line.replace(timeMatch.value, "").trim().trim(',', '.', '-')
 
+                // 1. Извлекаем lessonType
                 val lessonType = lessonTypes.firstOrNull { (keyword, _) ->
                     rest.lowercase().contains(keyword)
                 }?.second
 
+                if (lessonType != null) {
+                    rest = rest.replace(Regex("""(?i)\b${Regex.escape(lessonType)}\b"""), "").trim()
+                }
+
+                // 2. Извлекаем room
                 val roomMatch = roomRegex.find(rest)
                 val room = roomMatch?.groupValues?.getOrNull(1)
 
-                val cleanedSubject = rest
-                    .let { s -> if (lessonType != null) s.replace(Regex("""(?i)\b${Regex.escape(lessonType)}\b"""), "") else s }
-                    .let { s -> if (roomMatch != null) s.replace(roomMatch.value, "") else s }
-                    .replace(Regex("""[,.\-–—\s]+"""), " ")
-                    .trim()
+                if (roomMatch != null) {
+                    rest = rest.replace(roomMatch.value, "").trim()
+                }
 
-                // Пытаемся выделить предмет и преподавателя (преподаватель часто через запятую или в скобках)
+                // 3. Разделяем по запятым
+                val parts = rest.split(",").map { it.trim() }.filter { it.isNotBlank() }
+
+                // Первая часть — subject, последняя (если есть) — teacher
                 val subject: String
                 val teacher: String?
-                if (cleanedSubject.contains(",")) {
-                    val parts = cleanedSubject.split(",", limit = 2)
-                    subject = parts[0].trim()
-                    teacher = parts.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }
-                } else if (cleanedSubject.contains("(") && cleanedSubject.contains(")")) {
-                    val idx = cleanedSubject.indexOf("(")
-                    subject = cleanedSubject.substring(0, idx).trim()
-                    teacher = cleanedSubject.substring(idx + 1, cleanedSubject.lastIndexOf(")")).trim()
-                        .takeIf { it.isNotBlank() }
-                } else {
-                    subject = cleanedSubject
-                    teacher = null
+
+                when {
+                    parts.size >= 2 -> {
+                        subject = parts.first()
+                        teacher = parts.last().takeIf { 
+                            it.isNotBlank() && it != subject 
+                        }
+                    }
+                    parts.size == 1 -> {
+                        subject = parts.first()
+                        teacher = null
+                    }
+                    else -> {
+                        subject = rest.trim().trim(',', '.', '-', ' ').takeIf { it.isNotBlank() } ?: continue
+                        teacher = null
+                    }
                 }
 
                 if (subject.isBlank()) continue

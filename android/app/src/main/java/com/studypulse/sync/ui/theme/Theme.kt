@@ -1,113 +1,55 @@
 package com.studypulse.sync.ui.theme
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 
-private val LightColors = lightColorScheme(
-    primary = Color(0xFF3F51B5),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFE3E6FB),
-    onPrimaryContainer = Color(0xFF101B5E),
-    secondary = Color(0xFF5B6072),
-    onSecondary = Color.White,
-    background = Color(0xFFF8F9FF),
-    onBackground = Color(0xFF191B21),
-    surface = Color.White,
-    onSurface = Color(0xFF191B21),
-    surfaceVariant = Color(0xFFE1E2EC),
-    onSurfaceVariant = Color(0xFF44474F),
-    error = Color(0xFFBA1A1A),
-    onError = Color.White
+val StudyPulseLightColors = lightColorScheme(
+    primary = Blue40, onPrimary = Color.White, primaryContainer = Blue90, onPrimaryContainer = Blue20,
+    secondary = Teal40, onSecondary = Color.White, secondaryContainer = Teal90, onSecondaryContainer = Teal20,
+    tertiary = Amber40, onTertiary = Color.White, tertiaryContainer = Amber90, onTertiaryContainer = Amber20,
+    error = Red40, onError = Color.White, errorContainer = Red90, onErrorContainer = Red20,
+    background = Neutral98, onBackground = Neutral20,
+    surface = Color.White, onSurface = Neutral20, surfaceVariant = Neutral96, onSurfaceVariant = Neutral20,
+    outline = Neutral80
 )
 
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFFBCC5FF),
-    onPrimary = Color(0xFF081B4E),
-    primaryContainer = Color(0xFF25376F),
-    onPrimaryContainer = Color(0xFFDEE1FF),
-    secondary = Color(0xFFC3C6D2),
-    onSecondary = Color(0xFF2D313C),
-    background = Color(0xFF11131A),
-    onBackground = Color(0xFFE3E2E9),
-    surface = Color(0xFF11131A),
-    onSurface = Color(0xFFE3E2E9),
-    surfaceVariant = Color(0xFF44474F),
-    onSurfaceVariant = Color(0xFFC4C6D0),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005)
-)
-
-val StudyPulseTypography = Typography(
-    displaySmall = TextStyle(
-        fontSize = 34.sp,
-        lineHeight = 40.sp,
-        fontWeight = FontWeight.Bold
-    ),
-    headlineSmall = TextStyle(
-        fontSize = 24.sp,
-        lineHeight = 30.sp,
-        fontWeight = FontWeight.SemiBold
-    ),
-    titleLarge = TextStyle(
-        fontSize = 20.sp,
-        lineHeight = 26.sp,
-        fontWeight = FontWeight.SemiBold
-    ),
-    titleMedium = TextStyle(
-        fontSize = 16.sp,
-        lineHeight = 22.sp,
-        fontWeight = FontWeight.Medium
-    ),
-    titleSmall = TextStyle(
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        fontWeight = FontWeight.Medium
-    ),
-    bodyLarge = TextStyle(
-        fontSize = 16.sp,
-        lineHeight = 24.sp
-    ),
-    bodyMedium = TextStyle(
-        fontSize = 14.sp,
-        lineHeight = 20.sp
-    ),
-    bodySmall = TextStyle(
-        fontSize = 12.sp,
-        lineHeight = 16.sp
-    ),
-    labelLarge = TextStyle(
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        fontWeight = FontWeight.Medium
-    ),
-    labelMedium = TextStyle(
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        fontWeight = FontWeight.Medium
-    ),
-    labelSmall = TextStyle(
-        fontSize = 11.sp,
-        lineHeight = 14.sp,
-        fontWeight = FontWeight.Medium
-    )
+val StudyPulseDarkColors = darkColorScheme(
+    primary = Blue80, onPrimary = Blue20, primaryContainer = Blue40, onPrimaryContainer = Blue90,
+    secondary = Teal80, onSecondary = Teal20, secondaryContainer = Teal40, onSecondaryContainer = Teal90,
+    tertiary = Amber80, onTertiary = Amber20, tertiaryContainer = Amber40, onTertiaryContainer = Amber90,
+    error = Red80, onError = Red20, errorContainer = Red40, onErrorContainer = Red90,
+    background = Neutral10, onBackground = Neutral90,
+    surface = Neutral10, onSurface = Neutral90, surfaceVariant = Neutral20, onSurfaceVariant = Neutral80,
+    outline = Neutral20
 )
 
 @Composable
 fun StudyPulseTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        darkTheme -> StudyPulseDarkColors
+        else -> StudyPulseLightColors
+    }
+
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = colorScheme,
         typography = StudyPulseTypography,
+        shapes = StudyPulseShapes,
         content = content
     )
 }
