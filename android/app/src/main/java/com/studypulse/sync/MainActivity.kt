@@ -25,12 +25,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.studypulse.sync.ui.focus.FocusTimerScreen
 import com.studypulse.sync.ui.materials.MaterialsScreen
+import com.studypulse.sync.ui.ocr.MockOcrScreen
 import com.studypulse.sync.ui.packages.PackagesScreen
 import com.studypulse.sync.ui.plan.PlanScreen
 import com.studypulse.sync.ui.qa.QaScreen
 import com.studypulse.sync.ui.review.ReviewRequest
 import com.studypulse.sync.ui.review.ReviewScreen
 import com.studypulse.sync.ui.schedule.ScheduleScreen
+import com.studypulse.sync.ui.schedule.import.ScheduleImportScreen
 import com.studypulse.sync.ui.settings.SettingsScreen
 import com.studypulse.sync.ui.stats.StatsScreen
 import com.studypulse.sync.ui.subjects.SubjectScreen
@@ -55,6 +57,8 @@ fun StudyPulseApp() {
     var reviewRequest by remember { mutableStateOf<ReviewRequest?>(null) }
     var focusSlotId by remember { mutableStateOf<Long?>(null) }
     var qaMaterialId by remember { mutableStateOf<String?>(null) }
+    var showScheduleImport by remember { mutableStateOf(false) }
+    var showMockOcr by remember { mutableStateOf(false) }
 
     val tabs = listOf("Сегодня", "Пакеты", "Предметы", "Расписание", "Задания", "План", "Материалы", "Статистика", "Настройки")
 
@@ -62,6 +66,8 @@ fun StudyPulseApp() {
         reviewRequest = null
         focusSlotId = null
         qaMaterialId = null
+        showScheduleImport = false
+        showMockOcr = false
     }
 
     Scaffold(
@@ -74,54 +80,66 @@ fun StudyPulseApp() {
             val currentFocusSlotId = focusSlotId
             val currentQaMaterialId = qaMaterialId
 
-            if (currentReview != null) {
-                ReviewScreen(request = currentReview, onExit = { reviewRequest = null })
-            } else if (currentFocusSlotId != null) {
-                FocusTimerScreen(slotId = currentFocusSlotId, onExit = { focusSlotId = null })
-            } else if (currentQaMaterialId != null) {
-                QaScreen(materialExternalId = currentQaMaterialId, onExit = { qaMaterialId = null })
-            } else {
-                ScrollableTabRow(
-                    selectedTabIndex = selectedTab,
-                    edgePadding = 0.dp,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ) {
-                    tabs.forEachIndexed { index, title ->
-                        Tab(
-                            selected = selectedTab == index,
-                            onClick = { selectedTab = index },
-                            text = {
-                                Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
-                            },
-                            modifier = Modifier.padding(horizontal = 12.dp)
-                        )
-                    }
+            when {
+                currentReview != null -> {
+                    ReviewScreen(request = currentReview, onExit = { reviewRequest = null })
                 }
+                currentFocusSlotId != null -> {
+                    FocusTimerScreen(slotId = currentFocusSlotId, onExit = { focusSlotId = null })
+                }
+                currentQaMaterialId != null -> {
+                    QaScreen(materialExternalId = currentQaMaterialId, onExit = { qaMaterialId = null })
+                }
+                showScheduleImport -> {
+                    ScheduleImportScreen(onExit = { showScheduleImport = false })
+                }
+                showMockOcr -> {
+                    MockOcrScreen(onExit = { showMockOcr = false })
+                }
+                else -> {
+                    ScrollableTabRow(
+                        selectedTabIndex = selectedTab,
+                        edgePadding = 0.dp,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ) {
+                        tabs.forEachIndexed { index, title ->
+                            Tab(
+                                selected = selectedTab == index,
+                                onClick = { selectedTab = index },
+                                text = {
+                                    Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
+                                },
+                                modifier = Modifier.padding(horizontal = 12.dp)
+                            )
+                        }
+                    }
 
-                Column(modifier = Modifier.fillMaxSize()) {
-                    when (selectedTab) {
-                        0 -> TodayScreen(
-                            onOpenFocus = { slotId -> focusSlotId = slotId },
-                            onStartReview = { request -> reviewRequest = request },
-                            onGoToPlan = { selectedTab = 5 },
-                            onGoToTasks = { selectedTab = 4 }
-                        )
-                        1 -> PackagesScreen()
-                        2 -> SubjectScreen()
-                        3 -> ScheduleScreen()
-                        4 -> TasksScreen(onOpenPlanner = { selectedTab = 5; clearOverlays() })
-                        5 -> PlanScreen(
-                            onStartReview = { request -> reviewRequest = request },
-                            onOpenFocus = { slotId -> focusSlotId = slotId },
-                            onOpenQa = { materialId -> qaMaterialId = materialId }
-                        )
-                        6 -> MaterialsScreen(
-                            onStartReview = { request -> reviewRequest = request },
-                            onAsk = { materialId -> qaMaterialId = materialId }
-                        )
-                        7 -> StatsScreen()
-                        else -> SettingsScreen()
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        when (selectedTab) {
+                            0 -> TodayScreen(
+                                onOpenFocus = { slotId -> focusSlotId = slotId },
+                                onStartReview = { request -> reviewRequest = request },
+                                onGoToPlan = { selectedTab = 5 },
+                                onGoToTasks = { selectedTab = 4 }
+                            )
+                            1 -> PackagesScreen()
+                            2 -> SubjectScreen()
+                            3 -> ScheduleScreen(onOpenImport = { showScheduleImport = true })
+                            4 -> TasksScreen(onOpenPlanner = { selectedTab = 5; clearOverlays() })
+                            5 -> PlanScreen(
+                                onStartReview = { request -> reviewRequest = request },
+                                onOpenFocus = { slotId -> focusSlotId = slotId },
+                                onOpenQa = { materialId -> qaMaterialId = materialId }
+                            )
+                            6 -> MaterialsScreen(
+                                onStartReview = { request -> reviewRequest = request },
+                                onAsk = { materialId -> qaMaterialId = materialId },
+                                onOpenMockOcr = { showMockOcr = true }
+                            )
+                            7 -> StatsScreen()
+                            else -> SettingsScreen()
+                        }
                     }
                 }
             }

@@ -28,163 +28,80 @@ import com.studypulse.sync.data.local.entity.SubjectEntity
 import com.studypulse.sync.ui.review.ReviewRequest
 import kotlinx.serialization.json.Json
 
-private val json = Json {
-    ignoreUnknownKeys = true
-}
+private val json = Json { ignoreUnknownKeys = true }
 
 @Composable
 fun MaterialsScreen(
     onStartReview: (ReviewRequest) -> Unit = {},
     onAsk: (String) -> Unit = {},
+    onOpenMockOcr: () -> Unit = {},
     viewModel: MaterialsViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(onClick = viewModel::startAdd) {
-                Text("Добавить материал")
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = viewModel::startAdd, modifier = Modifier.weight(1f)) { Text("Добавить") }
+                OutlinedButton(onClick = onOpenMockOcr, modifier = Modifier.weight(1f)) { Text("Фото конспекта") }
             }
-
-            OutlinedButton(onClick = { onStartReview(ReviewRequest()) }) {
+            OutlinedButton(onClick = { onStartReview(ReviewRequest()) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Повторить все due-карточки")
             }
         }
 
-        state.message?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
+        state.message?.let { Text(text = it, style = MaterialTheme.typography.bodyMedium) }
 
         if (state.isFormOpen) {
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = if (state.editingExternalId == null) "Новый материал" else "Редактирование материала",
                         style = MaterialTheme.typography.titleMedium
                     )
-
                     if (state.subjects.isNotEmpty()) {
-                        Text(
-                            text = "Предметы",
-                            style = MaterialTheme.typography.labelLarge
-                        )
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { viewModel.selectSubject(null) }
-                            ) {
-                                Text("Без предмета")
-                            }
-
+                        Text(text = "Предметы", style = MaterialTheme.typography.labelLarge)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { viewModel.selectSubject(null) }) { Text("Без предмета") }
                             state.subjects.forEach { subject ->
-                                OutlinedButton(
-                                    onClick = { viewModel.selectSubject(subject) }
-                                ) {
-                                    Text(subject.name)
-                                }
+                                OutlinedButton(onClick = { viewModel.selectSubject(subject) }) { Text(subject.name) }
                             }
                         }
                     }
-
-                    OutlinedTextField(
-                        value = state.title,
-                        onValueChange = viewModel::onTitleChange,
-                        label = { Text("Название") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = state.sourceLabel,
-                        onValueChange = viewModel::onSourceLabelChange,
-                        label = { Text("Источник") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = state.text,
-                        onValueChange = viewModel::onTextChange,
-                        label = { Text("Текст материала") },
-                        minLines = 6,
-                        maxLines = 12,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(onClick = viewModel::save) {
-                            Text("Сохранить")
-                        }
-
-                        OutlinedButton(onClick = viewModel::toggleForm) {
-                            Text("Скрыть форму")
-                        }
+                    OutlinedTextField(value = state.title, onValueChange = viewModel::onTitleChange, label = { Text("Название") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = state.sourceLabel, onValueChange = viewModel::onSourceLabelChange, label = { Text("Источник") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = state.text, onValueChange = viewModel::onTextChange, label = { Text("Текст материала") }, minLines = 6, maxLines = 12, modifier = Modifier.fillMaxWidth())
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = viewModel::save) { Text("Сохранить") }
+                        OutlinedButton(onClick = viewModel::toggleForm) { Text("Скрыть форму") }
                     }
                 }
             }
         }
 
         if (state.materials.isEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = "Нет материалов", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = "Нет материалов",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Text(
-                        text = "Добавь материал вручную или скачай учебный пакет.",
+                        text = "Добавь материал вручную, обработай фото конспекта или скачай учебный пакет.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(
-                items = state.materials,
-                key = { it.externalId }
-            ) { material ->
+        LazyColumn(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(state.materials, key = { it.externalId }) { material ->
                 MaterialCard(
                     material = material,
                     onStartReview = {
-                        onStartReview(
-                            ReviewRequest(
-                                materialExternalId = material.externalId
-                            )
-                        )
+                        onStartReview(ReviewRequest(materialExternalId = material.externalId))
                     },
-                    onAsk = {
-                        onAsk(material.externalId)
-                    },
+                    onAsk = { onAsk(material.externalId) },
                     onEdit = { viewModel.startEdit(material) },
                     onDelete = { viewModel.delete(material) }
                 )
@@ -203,87 +120,32 @@ private fun MaterialCard(
 ) {
     val keyFacts = parseKeyFacts(material.keyFactsJson)
 
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = material.title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text = material.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             material.sourceLabel?.let { source ->
-                Text(
-                    text = "Источник: $source",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text(text = "Источник: $source", style = MaterialTheme.typography.bodySmall)
             }
-
-            Text(
-                text = "Источник данных: ${sourceLabel(material.source)}",
-                style = MaterialTheme.typography.bodySmall
-            )
-
-            Text(
-                text = material.summaryText,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 8,
-                overflow = TextOverflow.Ellipsis
-            )
+            Text(text = "Источник данных: ${sourceLabel(material.source)}", style = MaterialTheme.typography.bodySmall)
+            Text(text = material.summaryText, style = MaterialTheme.typography.bodyMedium, maxLines = 8, overflow = TextOverflow.Ellipsis)
 
             if (keyFacts.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(2.dp))
-
-                Text(
-                    text = "Ключевые факты:",
-                    style = MaterialTheme.typography.labelLarge
-                )
-
+                Text(text = "Ключевые факты:", style = MaterialTheme.typography.labelLarge)
                 keyFacts.take(4).forEach { fact ->
-                    Text(
-                        text = "• $fact",
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text(text = "• $fact", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onStartReview,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Повторить карточки материала")
-                }
-
-                OutlinedButton(
-                    onClick = onAsk,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Спросить по материалу")
-                }
-
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onStartReview, modifier = Modifier.fillMaxWidth()) { Text("Повторить карточки") }
+                OutlinedButton(onClick = onAsk, modifier = Modifier.fillMaxWidth()) { Text("Спросить по материалу") }
                 if (material.source == "LOCAL") {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(onClick = onEdit) {
-                            Text("Редактировать")
-                        }
-
-                        OutlinedButton(onClick = onDelete) {
-                            Text("Удалить")
-                        }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onEdit) { Text("Редактировать") }
+                        OutlinedButton(onClick = onDelete) { Text("Удалить") }
                     }
                 }
             }
@@ -293,7 +155,6 @@ private fun MaterialCard(
 
 private fun parseKeyFacts(raw: String?): List<String> {
     if (raw.isNullOrBlank()) return emptyList()
-
     return try {
         json.decodeFromString<List<String>>(raw)
     } catch (_: Throwable) {
@@ -301,10 +162,8 @@ private fun parseKeyFacts(raw: String?): List<String> {
     }
 }
 
-private fun sourceLabel(source: String): String {
-    return when (source) {
-        "LOCAL" -> "локальный"
-        "PACKAGE" -> "из пакета"
-        else -> source
-    }
+private fun sourceLabel(source: String): String = when (source) {
+    "LOCAL" -> "локальный"
+    "PACKAGE" -> "из пакета"
+    else -> source
 }

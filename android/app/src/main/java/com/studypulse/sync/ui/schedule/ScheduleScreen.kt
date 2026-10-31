@@ -40,7 +40,10 @@ private val weekdays = listOf(1 to "Пн", 2 to "Вт", 3 to "Ср", 4 to "Чт"
 private val parities = listOf("EVERY" to "Каждую", "NUMERATOR" to "Числитель", "DENOMINATOR" to "Знаменатель")
 
 @Composable
-fun ScheduleScreen(viewModel: ScheduleViewModel = viewModel()) {
+fun ScheduleScreen(
+    onOpenImport: () -> Unit = {},
+    viewModel: ScheduleViewModel = viewModel()
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -55,7 +58,10 @@ fun ScheduleScreen(viewModel: ScheduleViewModel = viewModel()) {
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = viewModel::startAdd) { Text("Добавить занятие") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = viewModel::startAdd) { Text("Добавить занятие") }
+                    OutlinedButton(onClick = onOpenImport) { Text("Импорт из текста") }
+                }
                 state.message?.let { Text(text = it, style = MaterialTheme.typography.bodyMedium) }
 
                 if (state.isFormOpen) {
@@ -66,7 +72,7 @@ fun ScheduleScreen(viewModel: ScheduleViewModel = viewModel()) {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(text = "Расписание пусто", style = MaterialTheme.typography.titleMedium)
-                            Text(text = "Добавь занятие вручную или скачай учебный пакет.", style = MaterialTheme.typography.bodyMedium)
+                            Text(text = "Добавь занятие вручную, импортируй из текста или скачай учебный пакет.", style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
