@@ -229,7 +229,7 @@ private fun MaterialCard(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
 
             // 1.3: описательный под-блок — один узел доступности (mergeDescendants как ПАРАМЕТР semantics).
-            Column(modifier = Modifier.semantics(mergeDescendants = true)) {
+            Column(modifier = Modifier.semantics(mergeDescendants = true) { }) {
                 // 3.2: заголовок материала помечен как heading.
                 Text(
                     text = title,
