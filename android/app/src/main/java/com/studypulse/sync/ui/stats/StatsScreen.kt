@@ -1,7 +1,8 @@
 package com.studypulse.sync.ui.stats
+import androidx.lifecycle.LifecycleOwner
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 
 import androidx.compose.foundation.layout.Arrangement
@@ -41,9 +42,9 @@ fun StatsScreen(
             try { viewModel.refresh() } catch (_: Throwable) { }
         }
 
-        val lifecycleOwner = LocalLifecycleOwner.current
+        val lifecycleOwner = LocalContext.current as? LifecycleOwner
         LaunchedEffect(lifecycleOwner) {
-            lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            lifecycleOwner?.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 try { viewModel.refresh() } catch (_: Throwable) { }
             }
         }
