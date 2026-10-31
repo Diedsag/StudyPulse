@@ -36,15 +36,21 @@ class AppContainer(context: Context) {
         ApiClient.create(baseUrl)
     }
 
-    val qaService: QaService = QaService(database)
+    val qaService: QaService =
+        QaService(database)
 
-    val planExporter: PlanExporter = PlanExporter(database)
+    val planExporter: PlanExporter =
+        PlanExporter(database)
 
     val backupManager: BackupManager =
-        BackupManager(context, planExporter)
+        BackupManager(
+            context = context,
+            planExporter = planExporter
+        )
 
-    val reminderScheduler: ReminderScheduler =
+    val reminderScheduler: ReminderScheduler by lazy {
         ReminderScheduler(context)
+    }
 
     val packageRepository: PackageRepository =
         PackageRepositoryImpl(
@@ -57,7 +63,10 @@ class AppContainer(context: Context) {
         StudyRepository(database)
 
     val localRepository: LocalRepository =
-        LocalRepository(database, qaService)
+        LocalRepository(
+            database = database,
+            qaService = qaService
+        )
 
     val syncRepository: SyncRepository =
         SyncRepository(

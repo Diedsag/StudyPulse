@@ -8,6 +8,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.studypulse.sync.StudyPulseApplication
+import com.studypulse.sync.di.AppContainer
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -18,30 +19,53 @@ class ReminderScheduler(
     private val context: Context
 ) {
 
-    private val wm = WorkManager.getInstance(context)
-    private val container = (context.applicationContext as StudyPulseApplication).container
+    private val wm: WorkManager by lazy {
+        WorkManager.getInstance(context)
+    }
+
+    private val container: AppContainer by lazy {
+        (context.applicationContext as StudyPulseApplication).container
+    }
 
     suspend fun scheduleForToday() {
         val profile = container.profileRepository.currentProfile()
-        if (!profile.notificationsEnabled || !profile.slotRemindersEnabled) return
+
+        if (!profile.notificationsEnabled || !profile.slotRemindersEnabled) {
+            return
+        }
 
         val now = System.currentTimeMillis()
-        val dayStart = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val dayStart = LocalDate.now()
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
         val dayEnd = dayStart + 24 * 60 * 60 * 1000
 
-        val slots = container.database.studySlotDao().getSlotsForDayOnce(dayStart, dayEnd)
+        val slots = container.database.studySlotDao()
+            .getSlotsForDayOnce(dayStart, dayEnd)
 
-        slots.forEach { swt ->
-            val slot = swt.slot
-            if (slot.status != "PLANNED") return@forEach
+        slots.forEach { slotWithTask ->
+            val slot = slotWithTask.slot
+
+            if (slot.status != "PLANNED") {
+                return@forEach
+            }
 
             val triggerAt = slot.startDateTime - 15 * 60 * 1000
             val delay = triggerAt - now
-            if (delay <= 0) return@forEach
+
+            if (delay <= 0) {
+                return@forEach
+            }
 
             val request = OneTimeWorkRequestBuilder<SlotReminderWorker>()
                 .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-                .setInputData(workDataOf("slotId" to slot.id))
+                .setInputData(
+                    workDataOf(
+                        "slotId" to slot.id
+                    )
+                )
                 .build()
 
             wm.enqueueUniqueWork(
@@ -54,18 +78,25 @@ class ReminderScheduler(
 
     suspend fun scheduleDeadlineReminders() {
         val profile = container.profileRepository.currentProfile()
-        if (!profile.notificationsEnabled || !profile.deadlineRemindersEnabled) return
+
+        if (!profile.notificationsEnabled || !profile.deadlineRemindersEnabled) {
+            return
+        }
 
         val now = System.currentTimeMillis()
         val tasks = container.database.taskDao().getActiveOnce()
 
         tasks.forEach { task ->
-            val deadlineMillis = parseDeadlineToEndOfDay(task.deadlineDate) ?: return@forEach
+            val deadlineMillis = parseDeadlineToEndOfDay(task.deadlineDate)
+                ?: return@forEach
 
             listOf(24, 3).forEach { hoursBefore ->
                 val triggerAt = deadlineMillis - hoursBefore * 60 * 60 * 1000
                 val delay = triggerAt - now
-                if (delay <= 0) return@forEach
+
+                if (delay <= 0) {
+                    return@forEach
+                }
 
                 val request = OneTimeWorkRequestBuilder<DeadlineReminderWorker>()
                     .setInitialDelay(delay, TimeUnit.MILLISECONDS)
@@ -95,8 +126,18 @@ class ReminderScheduler(
         }
 
         val now = LocalDateTime.now()
-        val target = now.withHour(7).withMinute(0).withSecond(0).withNano(0)
-        val trigger = if (now >= target) target.plusDays(1) else target
+        val target = now
+            .withHour(7)
+            .withMinute(0)
+            .withSecond(0)
+            .withNano(0)
+
+        val trigger = if (now >= target) {
+            target.plusDays(1)
+        } else {
+            target
+        }
+
         val delay = java.time.Duration.between(now, trigger).seconds
 
         val request = PeriodicWorkRequestBuilder<MorningDigestWorker>(1, TimeUnit.DAYS)
