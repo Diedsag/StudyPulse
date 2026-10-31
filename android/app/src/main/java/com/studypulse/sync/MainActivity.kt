@@ -27,6 +27,7 @@ import com.studypulse.sync.ui.review.ReviewRequest
 import com.studypulse.sync.ui.review.ReviewScreen
 import com.studypulse.sync.ui.schedule.ScheduleScreen
 import com.studypulse.sync.ui.settings.SettingsScreen
+import com.studypulse.sync.ui.stats.StatsScreen
 import com.studypulse.sync.ui.tasks.TasksScreen
 import com.studypulse.sync.ui.theme.StudyPulseTheme
 
@@ -122,6 +123,16 @@ fun StudyPulseApp() {
                         selectedTab = 5
                         reviewRequest = null
                     },
+                    icon = { Text("📊") },
+                    label = { Text("Stats") }
+                )
+
+                NavigationBarItem(
+                    selected = selectedTab == 6 && reviewRequest == null,
+                    onClick = {
+                        selectedTab = 6
+                        reviewRequest = null
+                    },
                     icon = { Text("⚙️") },
                     label = { Text("Settings") }
                 )
@@ -165,6 +176,8 @@ fun StudyPulseApp() {
                         }
                     )
 
+                    5 -> StatsScreen()
+
                     else -> SettingsScreen()
                 }
             }
@@ -179,6 +192,7 @@ private fun topBarTitle(tab: Int): String {
         2 -> "StudyPulse Tasks"
         3 -> "StudyPulse Plan"
         4 -> "StudyPulse Materials"
+        5 -> "StudyPulse Stats"
         else -> "StudyPulse Settings"
     }
 }

@@ -4,7 +4,9 @@ import com.studypulse.sync.core.network.dto.BundleResponse
 import com.studypulse.sync.core.network.dto.DeviceRegisterRequest
 import com.studypulse.sync.core.network.dto.DeviceRegisterResponse
 import com.studypulse.sync.core.network.dto.HealthResponse
+import com.studypulse.sync.core.network.dto.LeaderboardResponse
 import com.studypulse.sync.core.network.dto.PackageListResponse
+import com.studypulse.sync.core.network.dto.StatsResponse
 import com.studypulse.sync.core.network.dto.SyncBatchRequest
 import com.studypulse.sync.core.network.dto.SyncBatchResponse
 import retrofit2.http.Body
@@ -38,4 +40,16 @@ interface ApiService {
     suspend fun syncBatch(
         @Body request: SyncBatchRequest
     ): SyncBatchResponse
+
+    @GET("/api/me/stats")
+    suspend fun getStats(
+        @Query("device_uid") deviceUid: String
+    ): StatsResponse
+
+    @GET("/api/leaderboard")
+    suspend fun getLeaderboard(
+        @Query("device_uid") deviceUid: String,
+        @Query("period") period: String,
+        @Query("limit") limit: Int
+    ): LeaderboardResponse
 }
