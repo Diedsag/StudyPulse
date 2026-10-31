@@ -2,6 +2,8 @@ package com.studypulse.sync.ui.review
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ReviewScreen(
     request: ReviewRequest,
@@ -73,9 +76,7 @@ fun ReviewScreen(
         }
 
         if (state.finished) {
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -113,9 +114,7 @@ fun ReviewScreen(
             return@Column
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -157,40 +156,39 @@ fun ReviewScreen(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
+                    Text(
+                        text = "Оцени, насколько легко вспомнил:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
                             onClick = { viewModel.rate(1) },
-                            enabled = !state.isReviewing,
-                            modifier = Modifier.weight(1f)
+                            enabled = !state.isReviewing
                         ) {
-                            Text("Again")
+                            Text("Снова", maxLines = 1)
                         }
 
-                        Button(
+                        OutlinedButton(
                             onClick = { viewModel.rate(2) },
-                            enabled = !state.isReviewing,
-                            modifier = Modifier.weight(1f)
+                            enabled = !state.isReviewing
                         ) {
-                            Text("Hard")
+                            Text("Трудно", maxLines = 1)
                         }
 
-                        Button(
+                        OutlinedButton(
                             onClick = { viewModel.rate(3) },
-                            enabled = !state.isReviewing,
-                            modifier = Modifier.weight(1f)
+                            enabled = !state.isReviewing
                         ) {
-                            Text("Good")
+                            Text("Хорошо", maxLines = 1)
                         }
 
-                        Button(
+                        OutlinedButton(
                             onClick = { viewModel.rate(4) },
-                            enabled = !state.isReviewing,
-                            modifier = Modifier.weight(1f)
+                            enabled = !state.isReviewing
                         ) {
-                            Text("Easy")
+                            Text("Легко", maxLines = 1)
                         }
                     }
 

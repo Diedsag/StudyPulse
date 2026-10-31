@@ -2,6 +2,8 @@ package com.studypulse.sync.ui.schedule.import
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,8 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -39,13 +41,21 @@ fun ScheduleImportScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        OutlinedButton(onClick = onExit) { Text("Назад") }
+        OutlinedButton(onClick = onExit) {
+            Text("Назад")
+        }
 
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Text(
                     text = "Импорт расписания из текста",
                     style = MaterialTheme.typography.titleMedium
@@ -57,7 +67,10 @@ fun ScheduleImportScreen(
                 )
 
                 Text(
-                    text = "Пример:\nПонедельник\n10:00-11:30 Физика, лекция, ауд 204, Иванов А.П.\n14:00-15:30 История, семинар, ауд 312",
+                    text = """Пример:
+Понедельник
+10:00-11:30 Физика, лекция, ауд 204, Иванов А.П.
+14:00-15:30 История, семинар, ауд 312""",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -79,16 +92,22 @@ fun ScheduleImportScreen(
                         CircularProgressIndicator(modifier = Modifier.height(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                     }
+
                     Text("Распознать")
                 }
             }
         }
 
-        state.message?.let { Text(text = it, style = MaterialTheme.typography.bodyMedium) }
+        state.message?.let {
+            Text(text = it, style = MaterialTheme.typography.bodyMedium)
+        }
 
         if (state.lessons.isNotEmpty()) {
             Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
                         text = "Распознано занятий: ${state.lessons.size}",
                         style = MaterialTheme.typography.titleSmall
@@ -102,15 +121,14 @@ fun ScheduleImportScreen(
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
+            Column(
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                itemsIndexed(state.lessons, key = { index, _ -> index }) { index, lesson ->
+                state.lessons.forEachIndexed { index, lesson ->
                     LessonRow(
                         lesson = lesson,
                         onToggle = { viewModel.toggleLesson(index) },
-                        // ИСПРАВЛЕНО: явно передаём новый объект lesson
                         onUpdate = { newLesson -> viewModel.updateLesson(index, newLesson) }
                     )
                 }
@@ -125,12 +143,14 @@ fun ScheduleImportScreen(
                     CircularProgressIndicator(modifier = Modifier.height(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                 }
+
                 Text("Импортировать выбранные")
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LessonRow(
     lesson: ImportLessonState,
@@ -138,10 +158,18 @@ private fun LessonRow(
     onUpdate: (ImportLessonState) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = lesson.isChecked, onCheckedChange = { onToggle() })
+                Checkbox(
+                    checked = lesson.isChecked,
+                    onCheckedChange = { onToggle() }
+                )
+
                 Spacer(modifier = Modifier.width(8.dp))
+
                 Text(
                     text = when (lesson.parsed.confidence) {
                         ParsedLesson.Confidence.HIGH -> "Высокая уверенность"
@@ -174,12 +202,17 @@ private fun LessonRow(
             )
 
             Text(text = "День недели", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 weekdays.forEach { (value, label) ->
                     if (lesson.dayOfWeek == value) {
-                        Button(onClick = { onUpdate(lesson.copy(dayOfWeek = value)) }) { Text(label) }
+                        Button(onClick = { onUpdate(lesson.copy(dayOfWeek = value)) }) {
+                            Text(label, maxLines = 1)
+                        }
                     } else {
-                        OutlinedButton(onClick = { onUpdate(lesson.copy(dayOfWeek = value)) }) { Text(label) }
+                        OutlinedButton(onClick = { onUpdate(lesson.copy(dayOfWeek = value)) }) {
+                            Text(label, maxLines = 1)
+                        }
                     }
                 }
             }
@@ -190,14 +223,15 @@ private fun LessonRow(
                     onValueChange = { onUpdate(lesson.copy(startTime = it)) },
                     label = { Text("Начало") },
                     singleLine = true,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth(0.47f)
                 )
+
                 OutlinedTextField(
                     value = lesson.endTime,
                     onValueChange = { onUpdate(lesson.copy(endTime = it)) },
                     label = { Text("Конец") },
                     singleLine = true,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth(0.47f)
                 )
             }
 
@@ -218,12 +252,17 @@ private fun LessonRow(
             )
 
             Text(text = "Чётность", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 parities.forEach { (value, label) ->
                     if (lesson.parity == value) {
-                        Button(onClick = { onUpdate(lesson.copy(parity = value)) }) { Text(label) }
+                        Button(onClick = { onUpdate(lesson.copy(parity = value)) }) {
+                            Text(label, maxLines = 1)
+                        }
                     } else {
-                        OutlinedButton(onClick = { onUpdate(lesson.copy(parity = value)) }) { Text(label) }
+                        OutlinedButton(onClick = { onUpdate(lesson.copy(parity = value)) }) {
+                            Text(label, maxLines = 1)
+                        }
                     }
                 }
             }

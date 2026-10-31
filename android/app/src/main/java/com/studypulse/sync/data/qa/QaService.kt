@@ -29,6 +29,7 @@ class QaService(
     suspend fun chunkMaterial(material: MaterialEntity): Result<Int> {
         return try {
             val text = material.rawText ?: material.summaryText
+
             if (text.isBlank()) {
                 return Result.success(0)
             }
@@ -38,8 +39,9 @@ class QaService(
             val chunkSize = 600
             val overlap = 100
             val chunks = mutableListOf<MaterialChunkEntity>()
-
-            val paragraphs = text.split("\n\n", "\n").map { it.trim() }.filter { it.isNotBlank() }
+            val paragraphs = text.lines()
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
 
             var currentChunk = StringBuilder()
             var orderIndex = 0
@@ -60,7 +62,8 @@ class QaService(
                     val overlapText = currentChunk.takeLast(overlap)
                     currentChunk = StringBuilder(overlapText)
                 }
-                currentChunk.append(paragraph).append("\n")
+
+                currentChunk.append(paragraph).append(' ')
             }
 
             if (currentChunk.isNotBlank()) {
@@ -88,21 +91,58 @@ class QaService(
         allowGeneral: Boolean = false
     ): Result<QaAnswer> {
         return try {
-            val normalizedQuestion = question.trim().lowercase()
-            if (normalizedQuestion.isBlank()) {
+            val rawQuestion = question.trim()
+
+            if (rawQuestion.isBlank()) {
                 return Result.failure(IllegalArgumentException("Вопрос не может быть пустым"))
             }
 
+            val normalizedQuestion = rawQuestion.lowercase()
             val keywords = extractKeywords(normalizedQuestion)
 
-            val chunks = if (materialExternalId != null) {
-                chunkDao.searchByKeyword(materialExternalId, keywords.firstOrNull() ?: normalizedQuestion)
+            val terms = LinkedHashSet<String>()
+            terms.addAll(keywords)
+            terms.add(normalizedQuestion)
+
+            val allMaterialIds: List<String>? = if (materialExternalId == null) {
+                materialDao.getAllActiveOnce().map { it.externalId }
             } else {
-                val allMaterials = materialDao.getAllActiveOnce()
-                chunkDao.searchByKeywordInMaterials(allMaterials.map { it.externalId }, keywords.firstOrNull() ?: normalizedQuestion)
+                null
             }
 
-            if (chunks.isEmpty()) {
+            val scored = linkedMapOf<String, Pair<MaterialChunkEntity, Int>>()
+
+            for (term in terms) {
+                if (term.isBlank()) continue
+
+                val isWholeQuestion = term == normalizedQuestion
+
+                for (variant in caseVariants(term)) {
+                    val found = if (materialExternalId != null) {
+                        chunkDao.searchByKeyword(materialExternalId, variant)
+                    } else {
+                        chunkDao.searchByKeywordInMaterials(allMaterialIds ?: emptyList(), variant)
+                    }
+
+                    for (chunk in found) {
+                        val key = "${chunk.materialExternalId}#${chunk.orderIndex}"
+                        val addScore = if (isWholeQuestion) 1 else 2
+                        val existing = scored[key]
+
+                        scored[key] = if (existing == null) {
+                            chunk to addScore
+                        } else {
+                            existing.first to (existing.second + addScore)
+                        }
+                    }
+                }
+            }
+
+            val ranked = scored.values
+                .sortedByDescending { it.second }
+                .map { it.first }
+
+            if (ranked.isEmpty()) {
                 return Result.success(
                     QaAnswer(
                         text = "В ваших материалах этого нет.",
@@ -113,11 +153,12 @@ class QaService(
                 )
             }
 
-            val topChunks = chunks.take(3)
+            val topChunks = ranked.take(3)
             val materialMap = materialDao.getAllActiveOnce().associateBy { it.externalId }
 
             val citations = topChunks.map { chunk ->
                 val material = materialMap[chunk.materialExternalId]
+
                 Citation(
                     materialTitle = material?.title ?: "Неизвестный материал",
                     sourceLabel = material?.sourceLabel,
@@ -127,7 +168,7 @@ class QaService(
                 )
             }
 
-            val answerText = buildAnswer(topChunks, question)
+            val answerText = buildAnswer(topChunks)
 
             Result.success(
                 QaAnswer(
@@ -143,8 +184,11 @@ class QaService(
     }
 
     fun answerGeneral(question: String): QaAnswer {
+        val nl = System.lineSeparator()
+
         return QaAnswer(
-            text = "Это общий ответ, не основанный на ваших материалах.\n\n" +
+            text = "Это общий ответ, не основанный на ваших материалах." +
+                nl +
                 "Для точного ответа добавьте материалы и задайте вопрос по ним.",
             citations = emptyList(),
             isGeneral = true,
@@ -152,31 +196,45 @@ class QaService(
         )
     }
 
+    private fun caseVariants(word: String): List<String> {
+        val capitalized = word.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase() else it.toString()
+        }
+
+        return listOf(
+            word,
+            capitalized,
+            word.uppercase()
+        ).distinct()
+    }
+
     private fun extractKeywords(text: String): List<String> {
         val stopWords = setOf(
             "что", "как", "где", "когда", "почему", "зачем", "какой", "какая", "какие",
-            "это", "есть", "быть", "был", "была", "были", "будет",
-            "и", "или", "но", "а", "в", "на", "по", "с", "со", "к", "ко", "о", "об", "обо",
-            "из", "от", "до", "за", "перед", "над", "под", "про", "через",
-            "для", "при", "после", "до", "между", "среди"
+            "это", "есть", "быть", "был", "была", "были", "будет", "мне", "можно",
+            "расскажи", "объясни", "пожалуйста", "ли", "же", "бы", "ну", "вот",
+            "там", "тут", "все", "всё", "сам", "сама",
+            "и", "или", "но", "а", "в", "на", "по", "с", "со", "к", "ко",
+            "о", "об", "обо", "из", "от", "до", "за", "перед", "над", "под",
+            "про", "через", "для", "при", "после", "между", "среди"
         )
 
-        val words = text.split(Regex("\\s+"))
+        return text.split(' ')
             .map { it.lowercase().replace(Regex("[^а-яa-z0-9]"), "") }
-            .filter { it.length > 2 && it !in stopWords }
+            .filter { it.isNotBlank() && it.length >= 2 && it !in stopWords }
             .distinct()
-
-        return words.take(3)
+            .take(6)
     }
 
-    private fun buildAnswer(chunks: List<MaterialChunkEntity>, question: String): String {
-        val sb = StringBuilder()
-        sb.append("По вашим материалам:\n\n")
+    private fun buildAnswer(chunks: List<MaterialChunkEntity>): String {
+        val nl = System.lineSeparator()
+        val sb = StringBuilder("По вашим материалам:").append(nl)
 
         chunks.forEachIndexed { index, chunk ->
             sb.append(chunk.text.trim())
+
             if (index < chunks.lastIndex) {
-                sb.append("\n\n---\n\n")
+                sb.append(nl).append("---").append(nl)
             }
         }
 

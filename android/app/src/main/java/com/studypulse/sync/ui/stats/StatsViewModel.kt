@@ -35,11 +35,12 @@ class StatsViewModel(
 
     private val container = (application as StudyPulseApplication).container
     private val repository = container.statsRepository
-
     private val selectedPeriod = MutableStateFlow("week")
 
     private val _uiState = MutableStateFlow(StatsUiState())
     val uiState: StateFlow<StatsUiState> = _uiState.asStateFlow()
+
+    private var isRefreshingAll = false
 
     init {
         viewModelScope.launch {
@@ -92,6 +93,8 @@ class StatsViewModel(
                 errorMessage = null
             )
         }
+
+        refresh()
     }
 
     fun refresh() {
@@ -119,6 +122,53 @@ class StatsViewModel(
                         )
                     }
                 )
+            }
+        }
+    }
+
+    fun refreshAllPeriods() {
+        viewModelScope.launch {
+            if (isRefreshingAll || _uiState.value.isLoading) return@launch
+
+            isRefreshingAll = true
+
+            _uiState.update { currentState ->
+                currentState.copy(
+                    isLoading = true,
+                    errorMessage = null
+                )
+            }
+
+            try {
+                val current = selectedPeriod.value
+                val other = if (current == "week") "all" else "week"
+                val errors = mutableListOf<String>()
+
+                for (p in listOf(current, other).distinct()) {
+                    repository.refresh(p).exceptionOrNull()?.let { error ->
+                        errors += error.message ?: "Не удалось обновить период $p"
+                    }
+                }
+
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        isLoading = false,
+                        errorMessage = if (errors.isEmpty()) {
+                            null
+                        } else {
+                            errors.distinct().joinToString("; ")
+                        }
+                    )
+                }
+            } catch (e: Throwable) {
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        isLoading = false,
+                        errorMessage = e.message ?: "Не удалось обновить статистику"
+                    )
+                }
+            } finally {
+                isRefreshingAll = false
             }
         }
     }

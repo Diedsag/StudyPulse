@@ -31,29 +31,20 @@ data class QaUiState(
 class QaViewModel(
     application: Application
 ) : AndroidViewModel(application) {
-
     private val container = (application as StudyPulseApplication).container
     private val qaService: QaService = container.qaService
-
     private var materialExternalId: String? = null
-
     private val _uiState = MutableStateFlow(QaUiState())
     val uiState: StateFlow<QaUiState> = _uiState.asStateFlow()
 
     fun start(id: String) {
         materialExternalId = id
-
         viewModelScope.launch {
             _uiState.update { currentState ->
                 currentState.copy(isLoading = true)
             }
-
-            val material = container.localRepository.let { repo ->
-                // Получаем материал через прямой запрос к DAO
-                container.database.materialDao().getAllActiveOnce()
-                    .firstOrNull { it.externalId == id }
-            }
-
+            val material = container.database.materialDao().getAllActiveOnce()
+                .firstOrNull { it.externalId == id }
             if (material == null) {
                 _uiState.update { currentState ->
                     currentState.copy(
@@ -69,7 +60,8 @@ class QaViewModel(
                 }
                 return@launch
             }
-
+            // Ключевой фикс 4.6: чанки обязаны существовать до первого вопроса.
+            runCatching { qaService.chunkMaterial(material) }
             _uiState.update { currentState ->
                 currentState.copy(
                     isLoading = false,
@@ -78,7 +70,7 @@ class QaViewModel(
                     messages = listOf(
                         QaMessage(
                             isUser = false,
-                            text = "Задай вопрос по материалу «${material.title}».\n\n" +
+                            text = "Задай вопрос по материалу «${material.title}».\n" +
                                 "Ответы основаны на ваших материалах с цитатами на источник."
                         )
                     )
@@ -96,9 +88,7 @@ class QaViewModel(
     fun send() {
         val currentMaterialId = materialExternalId
         val question = _uiState.value.input.trim()
-
         if (question.isBlank() || _uiState.value.isSending) return
-
         _uiState.update { currentState ->
             currentState.copy(
                 input = "",
@@ -106,10 +96,8 @@ class QaViewModel(
                 messages = currentState.messages + QaMessage(isUser = true, text = question)
             )
         }
-
         viewModelScope.launch {
             val result = qaService.askQuestion(currentMaterialId, question, allowGeneral = false)
-
             _uiState.update { currentState ->
                 result.fold(
                     onSuccess = { answer ->
@@ -123,13 +111,12 @@ class QaViewModel(
                         } else {
                             QaMessage(
                                 isUser = false,
-                                text = answer.text + "\n\n" +
+                                text = answer.text + "\n" +
                                     "Можно попробовать режим «Ответить общо» (без цитат).",
                                 citations = emptyList(),
                                 isGeneral = false
                             )
                         }
-
                         currentState.copy(
                             isSending = false,
                             messages = currentState.messages + message
@@ -151,17 +138,14 @@ class QaViewModel(
 
     fun sendGeneral() {
         val question = _uiState.value.messages.lastOrNull { it.isUser }?.text ?: return
-
         _uiState.update { currentState ->
             currentState.copy(
                 isSending = true,
                 messages = currentState.messages + QaMessage(isUser = true, text = "[Общий режим] $question")
             )
         }
-
         viewModelScope.launch {
             val answer = qaService.answerGeneral(question)
-
             _uiState.update { currentState ->
                 currentState.copy(
                     isSending = false,
