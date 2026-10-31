@@ -15,7 +15,7 @@ class SyncWorker(
 
     override suspend fun doWork(): Result {
         return try {
-            val result = syncRepository.syncPendingEvents()
+            val result = syncRepository.sync()
             if (result.isSuccess) {
                 Result.success()
             } else {
