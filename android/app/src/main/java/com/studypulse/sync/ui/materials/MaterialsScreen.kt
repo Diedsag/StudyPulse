@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.studypulse.sync.data.local.entity.MaterialEntity
 import com.studypulse.sync.data.local.entity.SubjectEntity
 import com.studypulse.sync.ui.review.ReviewRequest
+import com.studypulse.sync.core.ux.UserLanguageMapper
 import kotlinx.serialization.json.Json
 
 private val json = Json { ignoreUnknownKeys = true }
@@ -46,7 +47,7 @@ fun MaterialsScreen(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = viewModel::startAdd, modifier = Modifier.weight(1f)) { Text("Добавить") }
-                OutlinedButton(onClick = onOpenMockOcr, modifier = Modifier.weight(1f)) { Text("Фото конспекта") }
+                OutlinedButton(onClick = onOpenMockOcr, modifier = Modifier.weight(1f)) { Text("Сканировать конспект") }
             }
             OutlinedButton(onClick = { onStartReview(ReviewRequest()) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Повторить все due-карточки")
@@ -126,7 +127,7 @@ private fun MaterialCard(
             material.sourceLabel?.let { source ->
                 Text(text = "Источник: $source", style = MaterialTheme.typography.bodySmall)
             }
-            Text(text = "Источник данных: ${sourceLabel(material.source)}", style = MaterialTheme.typography.bodySmall)
+            Text(text = "Источник данных: ${UserLanguageMapper.toUserSource(material.source)}", style = MaterialTheme.typography.bodySmall)
             Text(text = material.summaryText, style = MaterialTheme.typography.bodyMedium, maxLines = 8, overflow = TextOverflow.Ellipsis)
 
             if (keyFacts.isNotEmpty()) {

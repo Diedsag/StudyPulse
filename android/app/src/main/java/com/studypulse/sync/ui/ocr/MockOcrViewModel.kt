@@ -110,7 +110,7 @@ class MockOcrViewModel(application: Application) : AndroidViewModel(application)
                         currentState.copy(
                             isSaving = false,
                             saved = true,
-                            message = "Материал сохранён и разбит на чанки"
+                            message = "Материал сохранён"
                         )
                     },
                     onFailure = { error ->

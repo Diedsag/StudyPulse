@@ -46,12 +46,12 @@ fun MockOcrScreen(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Mock OCR — обработка фото конспекта",
+                    text = "Сканирование конспекта",
                     style = MaterialTheme.typography.titleMedium
                 )
 
                 Text(
-                    text = "Это демо-экран, имитирующий реальный OCR/ASR пайплайн. Вместо реального распознавания генерируется правдоподобный конспект по названию и предмету.",
+                    text = "Загрузи фото конспекта - приложение распознает текст, соберёт краткое саммари и ключевые факты, а затем подготовит материал к повторению.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

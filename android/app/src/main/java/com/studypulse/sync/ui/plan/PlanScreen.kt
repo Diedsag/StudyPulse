@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.studypulse.sync.core.ux.UserLanguageMapper
 import com.studypulse.sync.data.local.dao.SlotWithTaskMaterial
 import com.studypulse.sync.data.local.entity.MaterialEntity
 import com.studypulse.sync.ui.review.ReviewRequest
@@ -74,12 +75,12 @@ fun PlanScreen(
         }
 
         if (state.proposedSlots.isEmpty() && state.plannedSlots.isEmpty()) {
-            Text(text = "Слотов пока нет. Скачай пакет или добавь задания, затем построй план.", style = MaterialTheme.typography.bodyLarge)
+            Text(text = "Слотов пока нет. Добавь задания, и план появится автоматически.", style = MaterialTheme.typography.bodyLarge)
         }
 
         LazyColumn(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (state.proposedSlots.isNotEmpty()) {
-                item { Text(text = "Предложенный план", style = MaterialTheme.typography.titleMedium) }
+                item { Text(text = "Рекомендации на ближайшие дни", style = MaterialTheme.typography.titleMedium) }
                 items(state.proposedSlots, key = { "proposed-${it.slot.id}" }) { swt ->
                     val relevantMaterials = state.relevantMaterialsBySlot[swt.slot.id] ?: emptyList()
                     SlotCard(swt, relevantMaterials, showActions = false, isCompleting = false, onComplete = {}, onStartReview, onOpenFocus, onOpenQa)
@@ -88,7 +89,7 @@ fun PlanScreen(
             if (state.plannedSlots.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = "Принятый план", style = MaterialTheme.typography.titleMedium)
+                    Text(text = "Твой план", style = MaterialTheme.typography.titleMedium)
                 }
                 items(state.plannedSlots, key = { "planned-${it.slot.id}" }) { swt ->
                     val relevantMaterials = state.relevantMaterialsBySlot[swt.slot.id] ?: emptyList()
@@ -132,10 +133,9 @@ private fun SlotCard(
                 overflow = TextOverflow.Ellipsis
             )
             slotWithTask.taskSubject?.let { Text(text = "Предмет: $it", style = MaterialTheme.typography.bodyMedium) }
-            Text(text = "${formatTime(slot.startDateTime)}–${formatTime(slot.endDateTime)}", style = MaterialTheme.typography.bodyLarge)
+            Text(text = "${formatTime(slot.startDateTime)}-${formatTime(slot.endDateTime)}", style = MaterialTheme.typography.bodyLarge)
             Text(text = "Длительность: $durationMinutes мин", style = MaterialTheme.typography.bodyMedium)
 
-            // Почему предложен этот слот
             val deadline = slotWithTask.taskDeadline
             val priority = slotWithTask.taskPriority
             val reasonParts = mutableListOf<String>()
@@ -147,13 +147,12 @@ private fun SlotCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            // Релевантные материалы
             if (relevantMaterials.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(text = "Материалы:", style = MaterialTheme.typography.labelLarge)
                 relevantMaterials.take(2).forEach { material ->
                     Text(
-                        text = "• ${material.title}",
+                        text = "- ${material.title}",
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -161,7 +160,7 @@ private fun SlotCard(
                 }
             }
 
-            Text(text = "Статус: ${slot.status}", color = MaterialTheme.colorScheme.primary)
+            Text(text = "Статус: ${UserLanguageMapper.toUserSlotStatus(slot.status)}", color = MaterialTheme.colorScheme.primary)
 
             if (showActions) {
                 Spacer(modifier = Modifier.height(4.dp))
