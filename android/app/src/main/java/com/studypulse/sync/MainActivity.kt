@@ -113,7 +113,8 @@ fun StudyPulseApp() {
                         4 -> TasksScreen(onOpenPlanner = { selectedTab = 5; clearOverlays() })
                         5 -> PlanScreen(
                             onStartReview = { request -> reviewRequest = request },
-                            onOpenFocus = { slotId -> focusSlotId = slotId }
+                            onOpenFocus = { slotId -> focusSlotId = slotId },
+                            onOpenQa = { materialId -> qaMaterialId = materialId }
                         )
                         6 -> MaterialsScreen(
                             onStartReview = { request -> reviewRequest = request },

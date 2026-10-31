@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.studypulse.sync.data.qa.Citation
 
 @Composable
 fun QaScreen(
@@ -88,7 +89,7 @@ fun QaScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(state.messages) { message ->
-                MessageBubble(message = message)
+                MessageBubble(message = message, onAskGeneral = viewModel::sendGeneral)
             }
 
             if (state.isSending) {
@@ -98,7 +99,7 @@ fun QaScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         CircularProgressIndicator(modifier = Modifier.height(16.dp))
-                        Text("Думаю локально...")
+                        Text("Ищу в материалах...")
                     }
                 }
             }
@@ -108,7 +109,7 @@ fun QaScreen(
             value = state.input,
             onValueChange = viewModel::onInputChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Например: кратко о чём материал?") },
+            placeholder = { Text("Например: что такое первое начало термодинамики?") },
             minLines = 1,
             maxLines = 4
         )
@@ -125,7 +126,8 @@ fun QaScreen(
 
 @Composable
 private fun MessageBubble(
-    message: com.studypulse.sync.ui.qa.QaMessage
+    message: QaMessage,
+    onAskGeneral: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth()
@@ -135,15 +137,54 @@ private fun MessageBubble(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                text = if (message.isUser) "Ты" else "StudyPulse",
+                text = if (message.isUser) "Ты" else if (message.isGeneral) "StudyPulse (общий)" else "StudyPulse",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = if (message.isGeneral) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
             )
 
             Text(
                 text = message.text,
                 style = MaterialTheme.typography.bodyMedium
             )
+
+            if (message.citations.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Источники:",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                message.citations.forEachIndexed { index, citation ->
+                    Column(
+                        modifier = Modifier.padding(start = 8.dp, top = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = "[${index + 1}] ${citation.materialTitle}" +
+                                (citation.pageNumber?.let { ", стр. $it" } ?: "") +
+                                (citation.timecode?.let { ", $it" } ?: ""),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Text(
+                            text = citation.quotedText.take(150) + if (citation.quotedText.length > 150) "..." else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (!message.isUser && !message.isGeneral && message.citations.isEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(onClick = onAskGeneral) {
+                    Text("Ответить общо")
+                }
+            }
         }
     }
 }

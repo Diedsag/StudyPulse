@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.studypulse.sync.StudyPulseApplication
 import com.studypulse.sync.data.local.dao.SlotWithTaskMaterial
+import com.studypulse.sync.data.local.entity.MaterialEntity
 import com.studypulse.sync.data.local.entity.StudySlotEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 data class PlanUiState(
     val proposedSlots: List<SlotWithTaskMaterial> = emptyList(),
     val plannedSlots: List<SlotWithTaskMaterial> = emptyList(),
+    val relevantMaterialsBySlot: Map<Long, List<MaterialEntity>> = emptyMap(),
     val isGenerating: Boolean = false,
     val isReplanning: Boolean = false,
     val isAccepting: Boolean = false,
@@ -38,12 +40,27 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.proposedSlots.collect { slots ->
                 _uiState.update { it.copy(proposedSlots = slots) }
+                loadRelevantMaterials(slots)
             }
         }
         viewModelScope.launch {
             repository.plannedSlots.collect { slots ->
                 _uiState.update { it.copy(plannedSlots = slots) }
+                loadRelevantMaterials(slots)
             }
+        }
+    }
+
+    private fun loadRelevantMaterials(slots: List<SlotWithTaskMaterial>) {
+        viewModelScope.launch {
+            val materialsMap = mutableMapOf<Long, List<MaterialEntity>>()
+
+            slots.forEach { swt ->
+                val materials = repository.getRelevantMaterialsForSlot(swt.slot)
+                materialsMap[swt.slot.id] = materials
+            }
+
+            _uiState.update { it.copy(relevantMaterialsBySlot = materialsMap) }
         }
     }
 

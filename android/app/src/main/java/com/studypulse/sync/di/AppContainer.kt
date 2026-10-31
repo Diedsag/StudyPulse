@@ -6,6 +6,7 @@ import com.studypulse.sync.core.datastore.settingsDataStore
 import com.studypulse.sync.core.network.ApiClient
 import com.studypulse.sync.core.network.ApiService
 import com.studypulse.sync.data.local.AppDatabase
+import com.studypulse.sync.data.qa.QaService
 import com.studypulse.sync.data.repository.AssistantRepository
 import com.studypulse.sync.data.repository.LocalRepository
 import com.studypulse.sync.data.repository.PackageRepository
@@ -26,6 +27,8 @@ class AppContainer(context: Context) {
         ApiClient.create(baseUrl)
     }
 
+    val qaService: QaService = QaService(database)
+
     val packageRepository: PackageRepository =
         PackageRepositoryImpl(
             database = database,
@@ -37,7 +40,7 @@ class AppContainer(context: Context) {
         StudyRepository(database)
 
     val localRepository: LocalRepository =
-        LocalRepository(database)
+        LocalRepository(database, qaService)
 
     val syncRepository: SyncRepository =
         SyncRepository(

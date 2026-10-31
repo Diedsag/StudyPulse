@@ -11,6 +11,7 @@ import com.studypulse.sync.data.local.entity.ReviewLogEntity
 import com.studypulse.sync.data.local.entity.ScheduleItemEntity
 import com.studypulse.sync.data.local.entity.StudySlotEntity
 import com.studypulse.sync.data.local.entity.TaskEntity
+import com.studypulse.sync.data.qa.MaterialRelevanceScorer
 import com.studypulse.sync.data.srs.SpacedRepetitionScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -100,6 +101,13 @@ class StudyRepository(
     val plannedSlots: Flow<List<SlotWithTaskMaterial>> = studySlotDao.observeWithTaskMaterial("PLANNED")
 
     private val zone: ZoneId get() = ZoneId.systemDefault()
+
+    suspend fun getRelevantMaterialsForSlot(slot: StudySlotEntity): List<MaterialEntity> {
+        val task = taskDao.getById(slot.taskExternalId) ?: return emptyList()
+        val allMaterials = materialDao.getAllActiveOnce()
+
+        return MaterialRelevanceScorer.findRelevantMaterials(slot, task, allMaterials, limit = 3)
+    }
 
     fun upcomingOccurrences(daysAhead: Int = 7): Flow<List<ClassOccurrence>> {
         return combine(

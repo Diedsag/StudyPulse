@@ -5,13 +5,15 @@ import com.studypulse.sync.data.local.entity.MaterialEntity
 import com.studypulse.sync.data.local.entity.ScheduleItemEntity
 import com.studypulse.sync.data.local.entity.SubjectEntity
 import com.studypulse.sync.data.local.entity.TaskEntity
+import com.studypulse.sync.data.qa.QaService
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.UUID
 
 class LocalRepository(
-    private val database: AppDatabase
+    private val database: AppDatabase,
+    private val qaService: QaService
 ) {
 
     private val subjectDao = database.subjectDao()
@@ -217,6 +219,10 @@ class LocalRepository(
                 createdAt = now, updatedAt = now
             )
             materialDao.insertAll(listOf(entity))
+
+            // Автоматически разбиваем на чанки
+            qaService.chunkMaterial(entity)
+
             Result.success(entity)
         } catch (e: Throwable) {
             Result.failure(e)
@@ -240,6 +246,10 @@ class LocalRepository(
                 updatedAt = System.currentTimeMillis()
             )
             materialDao.update(entity)
+
+            // Перебиваем чанки
+            qaService.chunkMaterial(entity)
+
             Result.success(entity)
         } catch (e: Throwable) {
             Result.failure(e)

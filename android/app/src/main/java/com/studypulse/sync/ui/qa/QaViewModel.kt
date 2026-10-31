@@ -4,8 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.studypulse.sync.StudyPulseApplication
-import com.studypulse.sync.data.local.entity.MaterialEntity
-import kotlinx.coroutines.delay
+import com.studypulse.sync.data.qa.Citation
+import com.studypulse.sync.data.qa.QaService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +14,9 @@ import kotlinx.coroutines.launch
 
 data class QaMessage(
     val isUser: Boolean,
-    val text: String
+    val text: String,
+    val citations: List<Citation> = emptyList(),
+    val isGeneral: Boolean = false
 )
 
 data class QaUiState(
@@ -31,23 +33,28 @@ class QaViewModel(
 ) : AndroidViewModel(application) {
 
     private val container = (application as StudyPulseApplication).container
-    private val assistantRepository = container.assistantRepository
+    private val qaService: QaService = container.qaService
 
-    private var material: MaterialEntity? = null
+    private var materialExternalId: String? = null
 
     private val _uiState = MutableStateFlow(QaUiState())
     val uiState: StateFlow<QaUiState> = _uiState.asStateFlow()
 
-    fun start(materialExternalId: String) {
+    fun start(id: String) {
+        materialExternalId = id
+
         viewModelScope.launch {
             _uiState.update { currentState ->
                 currentState.copy(isLoading = true)
             }
 
-            val loadedMaterial = assistantRepository.getMaterial(materialExternalId)
-            material = loadedMaterial
+            val material = container.localRepository.let { repo ->
+                // Получаем материал через прямой запрос к DAO
+                container.database.materialDao().getAllActiveOnce()
+                    .firstOrNull { it.externalId == id }
+            }
 
-            if (loadedMaterial == null) {
+            if (material == null) {
                 _uiState.update { currentState ->
                     currentState.copy(
                         isLoading = false,
@@ -67,11 +74,12 @@ class QaViewModel(
                 currentState.copy(
                     isLoading = false,
                     materialFound = true,
-                    materialTitle = loadedMaterial.title,
+                    materialTitle = material.title,
                     messages = listOf(
                         QaMessage(
                             isUser = false,
-                            text = "Задай вопрос по материалу «${loadedMaterial.title}».\n\nЭто локальный демо-ассистент: он отвечает по сохранённому саммари и ключевым фактам, без настоящего LLM/RAG."
+                            text = "Задай вопрос по материалу «${material.title}».\n\n" +
+                                "Ответы основаны на ваших материалах с цитатами на источник."
                         )
                     )
                 )
@@ -86,7 +94,7 @@ class QaViewModel(
     }
 
     fun send() {
-        val currentMaterial = material ?: return
+        val currentMaterialId = materialExternalId
         val question = _uiState.value.input.trim()
 
         if (question.isBlank() || _uiState.value.isSending) return
@@ -100,14 +108,69 @@ class QaViewModel(
         }
 
         viewModelScope.launch {
-            delay(250L)
+            val result = qaService.askQuestion(currentMaterialId, question, allowGeneral = false)
 
-            val answer = assistantRepository.mockAnswer(currentMaterial, question)
+            _uiState.update { currentState ->
+                result.fold(
+                    onSuccess = { answer ->
+                        val message = if (answer.hasRelevantContext) {
+                            QaMessage(
+                                isUser = false,
+                                text = answer.text,
+                                citations = answer.citations,
+                                isGeneral = answer.isGeneral
+                            )
+                        } else {
+                            QaMessage(
+                                isUser = false,
+                                text = answer.text + "\n\n" +
+                                    "Можно попробовать режим «Ответить общо» (без цитат).",
+                                citations = emptyList(),
+                                isGeneral = false
+                            )
+                        }
+
+                        currentState.copy(
+                            isSending = false,
+                            messages = currentState.messages + message
+                        )
+                    },
+                    onFailure = { error ->
+                        currentState.copy(
+                            isSending = false,
+                            messages = currentState.messages + QaMessage(
+                                isUser = false,
+                                text = "Ошибка: ${error.message ?: "Не удалось получить ответ"}"
+                            )
+                        )
+                    }
+                )
+            }
+        }
+    }
+
+    fun sendGeneral() {
+        val question = _uiState.value.messages.lastOrNull { it.isUser }?.text ?: return
+
+        _uiState.update { currentState ->
+            currentState.copy(
+                isSending = true,
+                messages = currentState.messages + QaMessage(isUser = true, text = "[Общий режим] $question")
+            )
+        }
+
+        viewModelScope.launch {
+            val answer = qaService.answerGeneral(question)
 
             _uiState.update { currentState ->
                 currentState.copy(
                     isSending = false,
-                    messages = currentState.messages + QaMessage(isUser = false, text = answer)
+                    messages = currentState.messages + QaMessage(
+                        isUser = false,
+                        text = answer.text,
+                        citations = emptyList(),
+                        isGeneral = true
+                    )
                 )
             }
         }

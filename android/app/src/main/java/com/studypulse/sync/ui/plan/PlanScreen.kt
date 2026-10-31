@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.studypulse.sync.data.local.dao.SlotWithTaskMaterial
+import com.studypulse.sync.data.local.entity.MaterialEntity
 import com.studypulse.sync.ui.review.ReviewRequest
 import java.time.Instant
 import java.time.LocalDate
@@ -39,6 +40,7 @@ import java.time.format.DateTimeFormatter
 fun PlanScreen(
     onStartReview: (ReviewRequest) -> Unit = {},
     onOpenFocus: (Long) -> Unit = {},
+    onOpenQa: (String) -> Unit = {},
     viewModel: PlanViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -79,7 +81,8 @@ fun PlanScreen(
             if (state.proposedSlots.isNotEmpty()) {
                 item { Text(text = "Предложенный план", style = MaterialTheme.typography.titleMedium) }
                 items(state.proposedSlots, key = { "proposed-${it.slot.id}" }) { swt ->
-                    SlotCard(swt, showActions = false, isCompleting = false, onComplete = {}, onStartReview, onOpenFocus)
+                    val relevantMaterials = state.relevantMaterialsBySlot[swt.slot.id] ?: emptyList()
+                    SlotCard(swt, relevantMaterials, showActions = false, isCompleting = false, onComplete = {}, onStartReview, onOpenFocus, onOpenQa)
                 }
             }
             if (state.plannedSlots.isNotEmpty()) {
@@ -88,13 +91,16 @@ fun PlanScreen(
                     Text(text = "Принятый план", style = MaterialTheme.typography.titleMedium)
                 }
                 items(state.plannedSlots, key = { "planned-${it.slot.id}" }) { swt ->
+                    val relevantMaterials = state.relevantMaterialsBySlot[swt.slot.id] ?: emptyList()
                     SlotCard(
                         slotWithTask = swt,
+                        relevantMaterials = relevantMaterials,
                         showActions = true,
                         isCompleting = state.completingSlotId == swt.slot.id,
                         onComplete = { viewModel.completeSlot(swt.slot) },
                         onStartReview = onStartReview,
-                        onOpenFocus = onOpenFocus
+                        onOpenFocus = onOpenFocus,
+                        onOpenQa = onOpenQa
                     )
                 }
             }
@@ -105,11 +111,13 @@ fun PlanScreen(
 @Composable
 private fun SlotCard(
     slotWithTask: SlotWithTaskMaterial,
+    relevantMaterials: List<MaterialEntity>,
     showActions: Boolean,
     isCompleting: Boolean,
     onComplete: () -> Unit,
     onStartReview: (ReviewRequest) -> Unit,
-    onOpenFocus: (Long) -> Unit
+    onOpenFocus: (Long) -> Unit,
+    onOpenQa: (String) -> Unit
 ) {
     val slot = slotWithTask.slot
     val durationMinutes = ((slot.endDateTime - slot.startDateTime) / 60_000L).toInt()
@@ -124,9 +132,6 @@ private fun SlotCard(
                 overflow = TextOverflow.Ellipsis
             )
             slotWithTask.taskSubject?.let { Text(text = "Предмет: $it", style = MaterialTheme.typography.bodyMedium) }
-            slotWithTask.materialTitle?.let {
-                Text(text = "Материал: $it", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
             Text(text = "${formatTime(slot.startDateTime)}–${formatTime(slot.endDateTime)}", style = MaterialTheme.typography.bodyLarge)
             Text(text = "Длительность: $durationMinutes мин", style = MaterialTheme.typography.bodyMedium)
 
@@ -141,6 +146,20 @@ private fun SlotCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            // Релевантные материалы
+            if (relevantMaterials.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = "Материалы:", style = MaterialTheme.typography.labelLarge)
+                relevantMaterials.take(2).forEach { material ->
+                    Text(
+                        text = "• ${material.title}",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
 
             Text(text = "Статус: ${slot.status}", color = MaterialTheme.colorScheme.primary)
 
@@ -165,6 +184,13 @@ private fun SlotCard(
                         enabled = !isCompleting,
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("Повторить карточки") }
+                    if (relevantMaterials.isNotEmpty()) {
+                        OutlinedButton(
+                            onClick = { onOpenQa(relevantMaterials.first().externalId) },
+                            enabled = !isCompleting,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Спросить по материалу") }
+                    }
                     if (isCompleting) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp))

@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.studypulse.sync.data.local.dao.AssistantDao
 import com.studypulse.sync.data.local.dao.CardDao
+import com.studypulse.sync.data.local.dao.ChunkDao
 import com.studypulse.sync.data.local.dao.ClassInstanceDao
 import com.studypulse.sync.data.local.dao.MaterialDao
 import com.studypulse.sync.data.local.dao.PackageDao
@@ -18,6 +19,7 @@ import com.studypulse.sync.data.local.dao.SubjectDao
 import com.studypulse.sync.data.local.dao.TaskDao
 import com.studypulse.sync.data.local.entity.CardEntity
 import com.studypulse.sync.data.local.entity.ClassInstanceEntity
+import com.studypulse.sync.data.local.entity.MaterialChunkEntity
 import com.studypulse.sync.data.local.entity.MaterialEntity
 import com.studypulse.sync.data.local.entity.PendingEventEntity
 import com.studypulse.sync.data.local.entity.ReviewLogEntity
@@ -35,6 +37,7 @@ import com.studypulse.sync.data.local.entity.TaskEntity
         ScheduleItemEntity::class,
         TaskEntity::class,
         MaterialEntity::class,
+        MaterialChunkEntity::class,
         CardEntity::class,
         ClassInstanceEntity::class,
         StudySlotEntity::class,
@@ -42,7 +45,7 @@ import com.studypulse.sync.data.local.entity.TaskEntity
         PendingEventEntity::class,
         StatsSnapshotEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -52,6 +55,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun scheduleDao(): ScheduleDao
     abstract fun taskDao(): TaskDao
     abstract fun materialDao(): MaterialDao
+    abstract fun chunkDao(): ChunkDao
     abstract fun cardDao(): CardDao
     abstract fun classInstanceDao(): ClassInstanceDao
     abstract fun studySlotDao(): StudySlotDao
