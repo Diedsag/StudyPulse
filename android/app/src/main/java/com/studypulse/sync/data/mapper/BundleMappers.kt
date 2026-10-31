@@ -83,7 +83,9 @@ object BundleMappers {
             subject = subject,
             deadlineDate = deadlineDate,
             effortMinutes = effortMinutes,
-            priority = priority
+            priority = priority,
+            status = "PENDING",
+            remainingMinutes = effortMinutes
         )
     }
 

@@ -49,7 +49,11 @@ data class ScheduleItemEntity(
 
 @Entity(
     tableName = "tasks",
-    indices = [Index("packageExternalId"), Index("deadlineDate")]
+    indices = [
+        Index("packageExternalId"),
+        Index("deadlineDate"),
+        Index("status")
+    ]
 )
 data class TaskEntity(
     @PrimaryKey
@@ -62,7 +66,10 @@ data class TaskEntity(
 
     val deadlineDate: String,
     val effortMinutes: Int,
-    val priority: Int
+    val priority: Int,
+
+    val status: String,
+    val remainingMinutes: Int
 )
 
 @Entity(
@@ -105,5 +112,22 @@ data class CardEntity(
 
     val dueAt: Long,
     val createdAt: Long,
+    val updatedAt: Long
+)
+
+@Entity(
+    tableName = "class_instances",
+    primaryKeys = ["templateExternalId", "date"],
+    indices = [Index("date")]
+)
+data class ClassInstanceEntity(
+    val templateExternalId: String,
+    val date: String,
+
+    val status: String,
+
+    val overriddenStartTime: String? = null,
+    val overriddenEndTime: String? = null,
+
     val updatedAt: Long
 )

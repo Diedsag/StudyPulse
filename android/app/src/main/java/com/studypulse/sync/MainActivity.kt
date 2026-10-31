@@ -20,7 +20,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.studypulse.sync.ui.packages.PackagesScreen
+import com.studypulse.sync.ui.schedule.ScheduleScreen
 import com.studypulse.sync.ui.settings.SettingsScreen
+import com.studypulse.sync.ui.tasks.TasksScreen
 import com.studypulse.sync.ui.theme.StudyPulseTheme
 
 class MainActivity : ComponentActivity() {
@@ -46,13 +48,7 @@ fun StudyPulseApp() {
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = if (selectedTab == 0) {
-                            "StudyPulse Packages"
-                        } else {
-                            "StudyPulse Settings"
-                        }
-                    )
+                    Text(text = topBarTitle(selectedTab))
                 }
             )
         },
@@ -68,6 +64,20 @@ fun StudyPulseApp() {
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
+                    icon = { Text("📅") },
+                    label = { Text("Schedule") }
+                )
+
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    icon = { Text("📝") },
+                    label = { Text("Tasks") }
+                )
+
+                NavigationBarItem(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
                     icon = { Text("⚙️") },
                     label = { Text("Settings") }
                 )
@@ -81,8 +91,19 @@ fun StudyPulseApp() {
         ) {
             when (selectedTab) {
                 0 -> PackagesScreen()
+                1 -> ScheduleScreen()
+                2 -> TasksScreen()
                 else -> SettingsScreen()
             }
         }
+    }
+}
+
+private fun topBarTitle(tab: Int): String {
+    return when (tab) {
+        0 -> "StudyPulse Packages"
+        1 -> "StudyPulse Schedule"
+        2 -> "StudyPulse Tasks"
+        else -> "StudyPulse Settings"
     }
 }

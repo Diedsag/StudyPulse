@@ -5,11 +5,13 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.studypulse.sync.data.local.dao.CardDao
+import com.studypulse.sync.data.local.dao.ClassInstanceDao
 import com.studypulse.sync.data.local.dao.MaterialDao
 import com.studypulse.sync.data.local.dao.PackageDao
 import com.studypulse.sync.data.local.dao.ScheduleDao
 import com.studypulse.sync.data.local.dao.TaskDao
 import com.studypulse.sync.data.local.entity.CardEntity
+import com.studypulse.sync.data.local.entity.ClassInstanceEntity
 import com.studypulse.sync.data.local.entity.MaterialEntity
 import com.studypulse.sync.data.local.entity.ScheduleItemEntity
 import com.studypulse.sync.data.local.entity.StudyPackageEntity
@@ -21,9 +23,10 @@ import com.studypulse.sync.data.local.entity.TaskEntity
         ScheduleItemEntity::class,
         TaskEntity::class,
         MaterialEntity::class,
-        CardEntity::class
+        CardEntity::class,
+        ClassInstanceEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,6 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun materialDao(): MaterialDao
     abstract fun cardDao(): CardDao
+    abstract fun classInstanceDao(): ClassInstanceDao
 
     companion object {
 
