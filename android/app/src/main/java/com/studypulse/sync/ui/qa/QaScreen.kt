@@ -37,8 +37,8 @@ fun QaScreen(
     viewModel: QaViewModel = viewModel()
 ) {
         QaDemoNotice()
-        QaDynamicStatus(state)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+        QaDynamicStatus(state)
     val listState = rememberLazyListState()
 
     LaunchedEffect(materialExternalId) {
