@@ -51,14 +51,14 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Connection",
+                    text = "Подключение",
                     style = MaterialTheme.typography.titleMedium
                 )
 
                 OutlinedTextField(
                     value = state.serverUrl,
                     onValueChange = viewModel::onServerUrlChange,
-                    label = { Text("Server URL") },
+                    label = { Text("Адрес сервера") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -66,13 +66,13 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = state.nickname,
                     onValueChange = viewModel::onNicknameChange,
-                    label = { Text("Nickname") },
+                    label = { Text("Никнейм") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 Text(
-                    text = "Device UID: " + state.deviceUid.ifBlank { "not generated" },
+                    text = "Идентификатор устройства: " + state.deviceUid.ifBlank { "не создан" },
                     style = MaterialTheme.typography.bodyMedium
                 )
 
@@ -89,15 +89,15 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(onClick = viewModel::saveSettings) {
-                        Text("Save")
+                        Text("Сохранить")
                     }
 
                     Button(onClick = viewModel::generateDeviceUid) {
-                        Text("Generate UID")
+                        Text("Создать UID")
                     }
 
                     Button(onClick = viewModel::checkConnection) {
-                        Text("Check")
+                        Text("Проверить")
                     }
                 }
 
@@ -105,7 +105,7 @@ fun SettingsScreen(
 
                 when (val status = state.status) {
                     is ConnectionStatus.Idle -> {
-                        Text("Status: idle")
+                        Text("Статус: ожидание")
                     }
 
                     is ConnectionStatus.Loading -> {
@@ -113,20 +113,20 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                            Text("Checking connection...")
+                            Text("Проверяем подключение...")
                         }
                     }
 
                     is ConnectionStatus.Connected -> {
                         Text(
-                            text = "Connected. Server time: ${status.time}",
+                            text = "Подключено. Время сервера: ${status.time}",
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
 
                     is ConnectionStatus.Error -> {
                         Text(
-                            text = "Error: ${status.message}",
+                            text = "Ошибка: ${status.message}",
                             color = MaterialTheme.colorScheme.error
                         )
                     }
@@ -142,7 +142,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Sync",
+                    text = "Синхронизация",
                     style = MaterialTheme.typography.titleMedium
                 )
 
@@ -181,8 +181,8 @@ fun SettingsScreen(
                 }
 
                 Text(
-                    text = "XP: ${syncState.totalXp}, weekly: ${syncState.weeklyXp}, " +
-                        "level: ${syncState.level}, streak: ${syncState.streakDays}",
+                    text = "XP: ${syncState.totalXp}, недельный XP: ${syncState.weeklyXp}, " +
+                        "уровень: ${syncState.level}, streak: ${syncState.streakDays}",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -196,7 +196,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Hint",
+                    text = "Подсказка",
                     style = MaterialTheme.typography.titleMedium
                 )
 

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -22,11 +21,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.studypulse.sync.data.local.dao.SlotWithTaskMaterial
-import com.studypulse.sync.data.local.entity.StudySlotEntity
 import com.studypulse.sync.ui.review.ReviewRequest
 import java.time.Instant
 import java.time.ZoneId
@@ -35,6 +34,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun PlanScreen(
     onStartReview: (ReviewRequest) -> Unit = {},
+    onOpenFocus: (Long) -> Unit = {},
     viewModel: PlanViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -130,7 +130,8 @@ fun PlanScreen(
                         showActions = false,
                         isCompleting = false,
                         onComplete = {},
-                        onStartReview = onStartReview
+                        onStartReview = onStartReview,
+                        onOpenFocus = onOpenFocus
                     )
                 }
             }
@@ -156,7 +157,8 @@ fun PlanScreen(
                         onComplete = {
                             viewModel.completeSlot(slotWithTask.slot)
                         },
-                        onStartReview = onStartReview
+                        onStartReview = onStartReview,
+                        onOpenFocus = onOpenFocus
                     )
                 }
             }
@@ -170,7 +172,8 @@ private fun SlotCard(
     showActions: Boolean,
     isCompleting: Boolean,
     onComplete: () -> Unit,
-    onStartReview: (ReviewRequest) -> Unit
+    onStartReview: (ReviewRequest) -> Unit,
+    onOpenFocus: (Long) -> Unit
 ) {
     val slot = slotWithTask.slot
     val durationMinutes = ((slot.endDateTime - slot.startDateTime) / 60_000L).toInt()
@@ -189,7 +192,9 @@ private fun SlotCard(
 
             Text(
                 text = slotWithTask.taskTitle,
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
 
             slotWithTask.taskSubject?.let { subject ->
@@ -202,7 +207,9 @@ private fun SlotCard(
             slotWithTask.materialTitle?.let { materialTitle ->
                 Text(
                     text = "Материал: $materialTitle",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -224,13 +231,13 @@ private fun SlotCard(
             if (showActions) {
                 Spacer(modifier = Modifier.height(4.dp))
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
                         onClick = onComplete,
-                        enabled = !isCompleting
+                        enabled = !isCompleting,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Выполнено")
                     }
@@ -244,13 +251,28 @@ private fun SlotCard(
                                 )
                             )
                         },
-                        enabled = !isCompleting
+                        enabled = !isCompleting,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Повторить")
+                        Text("Повторить карточки")
+                    }
+
+                    OutlinedButton(
+                        onClick = { onOpenFocus(slot.id) },
+                        enabled = !isCompleting,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Фокус-таймер")
                     }
 
                     if (isCompleting) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                            Text("Сохраняем...")
+                        }
                     }
                 }
             }

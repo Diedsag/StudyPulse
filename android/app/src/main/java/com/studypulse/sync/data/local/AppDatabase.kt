@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.studypulse.sync.data.local.dao.AssistantDao
 import com.studypulse.sync.data.local.dao.CardDao
 import com.studypulse.sync.data.local.dao.ClassInstanceDao
 import com.studypulse.sync.data.local.dao.MaterialDao
@@ -38,7 +39,7 @@ import com.studypulse.sync.data.local.entity.TaskEntity
         PendingEventEntity::class,
         StatsSnapshotEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -53,6 +54,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun reviewLogDao(): ReviewLogDao
     abstract fun pendingEventDao(): PendingEventDao
     abstract fun statsSnapshotDao(): StatsSnapshotDao
+    abstract fun assistantDao(): AssistantDao
 
     companion object {
 
