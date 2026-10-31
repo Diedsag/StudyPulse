@@ -59,7 +59,7 @@ object SettingsKeys {
 - endTime: String, например "11:30"
 - room: String?
 - teacher: String?
-- parity: String?例如 "every", "numerator", "denominator"
+- parity: String? например "every", "numerator", "denominator"
 
 Индексы:
 
