@@ -10,8 +10,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.studypulse.sync.data.backup.BackupInfo
 import com.studypulse.sync.ui.sync.SyncViewModel
 import java.time.Instant
 import java.time.ZoneId
@@ -44,6 +48,7 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val syncState by syncViewModel.uiState.collectAsStateWithLifecycle()
     var devExpanded by remember { mutableStateOf(false) }
+    var restoreDialogBackup by remember { mutableStateOf<BackupInfo?>(null) }
 
     Column(
         modifier = Modifier
@@ -102,28 +107,76 @@ fun SettingsScreen(
         }
 
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(text = "Резервная копия", style = MaterialTheme.typography.titleMedium)
                 Text(
                     text = "Сохрани копию плана, расписания, заданий и материалов на устройстве.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Button(onClick = viewModel::exportPlan, modifier = Modifier.fillMaxWidth()) {
-                    Text("Создать резервную копию")
+
+                Button(
+                    onClick = viewModel::createBackup,
+                    enabled = !state.isCreatingBackup && !state.isRestoringBackup,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (state.isCreatingBackup) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(if (state.isCreatingBackup) "Создание..." else "Создать резервную копию")
                 }
-                state.exportedJson?.let {
-                    Text(
-                        text = "Копия готова. Её можно перенести или восстановить позже.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    OutlinedButton(onClick = viewModel::clearExportedJson) { Text("Скрыть") }
+
+                if (state.backups.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = "Доступные копии:", style = MaterialTheme.typography.labelMedium)
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(state.backups) { backup ->
+                            BackupItem(
+                                backup = backup,
+                                onRestore = { restoreDialogBackup = backup },
+                                onDelete = { viewModel.deleteBackup(backup.path) }
+                            )
+                        }
+                    }
                 }
+
                 state.message?.let {
                     Text(text = it, style = MaterialTheme.typography.bodySmall)
                 }
             }
+        }
+
+        if (restoreDialogBackup != null) {
+            AlertDialog(
+                onDismissRequest = { restoreDialogBackup = null },
+                title = { Text("Восстановить копию?") },
+                text = { Text("Текущие данные будут заменены данными из копии от ${restoreDialogBackup?.formattedDate()}.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.restoreBackup(restoreDialogBackup!!.path)
+                            restoreDialogBackup = null
+                        },
+                        enabled = !state.isRestoringBackup
+                    ) {
+                        if (state.isRestoringBackup) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(if (state.isRestoringBackup) "Восстановление..." else "Восстановить")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { restoreDialogBackup = null }) {
+                        Text("Отмена")
+                    }
+                }
+            )
         }
 
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -184,6 +237,42 @@ fun SettingsScreen(
                     if (state.isDirty) {
                         Text(text = "Есть несохранённые изменения", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackupItem(
+    backup: BackupInfo,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = backup.formattedDate(),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = backup.formattedSize(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onRestore) {
+                    Text("Восстановить")
+                }
+                OutlinedButton(onClick = onDelete) {
+                    Text("Удалить")
                 }
             }
         }

@@ -5,6 +5,7 @@ import com.studypulse.sync.core.datastore.SettingsRepository
 import com.studypulse.sync.core.datastore.settingsDataStore
 import com.studypulse.sync.core.network.ApiClient
 import com.studypulse.sync.core.network.ApiService
+import com.studypulse.sync.data.backup.BackupManager
 import com.studypulse.sync.data.export.PlanExporter
 import com.studypulse.sync.data.local.AppDatabase
 import com.studypulse.sync.data.profile.ProfileRepository
@@ -37,6 +38,9 @@ class AppContainer(context: Context) {
     val qaService: QaService = QaService(database)
 
     val planExporter: PlanExporter = PlanExporter(database)
+
+    val backupManager: BackupManager =
+        BackupManager(context, planExporter)
 
     val packageRepository: PackageRepository =
         PackageRepositoryImpl(

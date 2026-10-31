@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.studypulse.sync.StudyPulseApplication
+import com.studypulse.sync.data.backup.BackupInfo
 import com.studypulse.sync.notifications.NotificationScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +24,9 @@ data class SettingsUiState(
     val isDirty: Boolean = false,
     val status: ConnectionStatus = ConnectionStatus.Idle,
     val message: String? = null,
-    val exportedJson: String? = null
+    val backups: List<BackupInfo> = emptyList(),
+    val isCreatingBackup: Boolean = false,
+    val isRestoringBackup: Boolean = false
 )
 
 sealed class ConnectionStatus {
@@ -38,12 +41,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val container = (application as StudyPulseApplication).container
     private val settingsRepository = container.settingsRepository
     private val profileRepository = container.profileRepository
-    private val planExporter = container.planExporter
+    private val backupManager = container.backupManager
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
+        loadBackups()
+
         viewModelScope.launch {
             try {
                 val s = settingsRepository.currentSettings()
@@ -71,6 +76,78 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
             }
+        }
+    }
+
+    fun loadBackups() {
+        viewModelScope.launch {
+            val backups = backupManager.listBackups()
+            _uiState.update { it.copy(backups = backups) }
+        }
+    }
+
+    fun createBackup() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCreatingBackup = true, message = null) }
+
+            val result = backupManager.createBackup()
+
+            _uiState.update { currentState ->
+                result.fold(
+                    onSuccess = { path ->
+                        currentState.copy(
+                            isCreatingBackup = false,
+                            message = "Резервная копия создана"
+                        )
+                    },
+                    onFailure = { error ->
+                        currentState.copy(
+                            isCreatingBackup = false,
+                            message = "Не удалось создать копию: ${error.message}"
+                        )
+                    }
+                )
+            }
+
+            loadBackups()
+        }
+    }
+
+    fun restoreBackup(backupPath: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRestoringBackup = true, message = null) }
+
+            val result = backupManager.restoreBackup(backupPath)
+
+            _uiState.update { currentState ->
+                result.fold(
+                    onSuccess = {
+                        currentState.copy(
+                            isRestoringBackup = false,
+                            message = "Данные восстановлены. Перезапустите приложение."
+                        )
+                    },
+                    onFailure = { error ->
+                        currentState.copy(
+                            isRestoringBackup = false,
+                            message = "Не удалось восстановить: ${error.message}"
+                        )
+                    }
+                )
+            }
+        }
+    }
+
+    fun deleteBackup(backupPath: String) {
+        viewModelScope.launch {
+            val result = backupManager.deleteBackup(backupPath)
+
+            result.fold(
+                onSuccess = { loadBackups() },
+                onFailure = { error ->
+                    _uiState.update { it.copy(message = "Не удалось удалить: ${error.message}") }
+                }
+            )
         }
     }
 
@@ -124,15 +201,5 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun exportPlan() {
-        viewModelScope.launch {
-            val result = planExporter.exportPlan()
-            result.fold(
-                onSuccess = { json -> _uiState.update { it.copy(exportedJson = json, message = "Резервная копия готова") } },
-                onFailure = { error -> _uiState.update { it.copy(message = "Не удалось создать копию: ${error.message}") } }
-            )
-        }
-    }
-
-    fun clearExportedJson() = _uiState.update { it.copy(exportedJson = null) }
+    fun clearMessage() = _uiState.update { it.copy(message = null) }
 }
