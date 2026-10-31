@@ -19,16 +19,28 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selectableGroup
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.studypulse.sync.core.ux.UserLanguageMapper
 import com.studypulse.sync.data.local.entity.MaterialEntity
-import com.studypulse.sync.data.local.entity.SubjectEntity
 import com.studypulse.sync.ui.review.ReviewRequest
 import kotlinx.serialization.json.Json
 
@@ -42,6 +54,7 @@ fun MaterialsScreen(
     viewModel: MaterialsViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -59,7 +72,14 @@ fun MaterialsScreen(
             }
         }
 
-        state.message?.let { Text(text = it, style = MaterialTheme.typography.bodyMedium) }
+        // 1.4: сообщение экрана — polite live-region (озвучивается без сброса фокуса).
+        state.message?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+            )
+        }
 
         if (state.isFormOpen) {
             MaterialForm(state = state, viewModel = viewModel)
@@ -81,9 +101,7 @@ fun MaterialsScreen(
             state.materials.forEach { material ->
                 MaterialCard(
                     material = material,
-                    onStartReview = {
-                        onStartReview(ReviewRequest(materialExternalId = material.externalId))
-                    },
+                    onStartReview = { onStartReview(ReviewRequest(materialExternalId = material.externalId)) },
                     onAsk = { onAsk(material.externalId) },
                     onEdit = { viewModel.startEdit(material) },
                     onDelete = { viewModel.delete(material) }
@@ -96,6 +114,10 @@ fun MaterialsScreen(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MaterialForm(state: MaterialsUiState, viewModel: MaterialsViewModel) {
+    // 1.5: фокус на поле названия при открытии формы, с защитой от гонки attach/detach.
+    val titleFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { titleFocus.requestFocus() } }
+
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
@@ -124,25 +146,62 @@ private fun MaterialForm(state: MaterialsUiState, viewModel: MaterialsViewModel)
 
             if (state.subjects.isNotEmpty()) {
                 Text(text = "Предметы", style = MaterialTheme.typography.labelLarge)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (state.selectedSubjectId == null) {
-                        Button(onClick = { viewModel.selectSubject(null) }) { Text("Без предмета") }
+                // 1.2: группа выбора поверх существующих Button/OutlinedButton (без FilterChip).
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.semantics { selectableGroup() }
+                ) {
+                    val noneSelected = state.selectedSubjectId == null
+                    if (noneSelected) {
+                        Button(
+                            onClick = { viewModel.selectSubject(null) },
+                            modifier = Modifier.semantics { role = Role.RadioButton; selected = true }
+                        ) { Text("Без предмета", maxLines = 1) }
                     } else {
-                        OutlinedButton(onClick = { viewModel.selectSubject(null) }) { Text("Без предмета") }
+                        OutlinedButton(
+                            onClick = { viewModel.selectSubject(null) },
+                            modifier = Modifier.semantics { role = Role.RadioButton; selected = false }
+                        ) { Text("Без предмета", maxLines = 1) }
                     }
                     state.subjects.forEach { subject ->
-                        if (state.selectedSubjectId == subject.id) {
-                            Button(onClick = { viewModel.selectSubject(subject) }) { Text(subject.name) }
+                        val sel = state.selectedSubjectId == subject.id
+                        if (sel) {
+                            Button(
+                                onClick = { viewModel.selectSubject(subject) },
+                                modifier = Modifier.semantics { role = Role.RadioButton; selected = true }
+                            ) { Text(subject.name, maxLines = 1) }
                         } else {
-                            OutlinedButton(onClick = { viewModel.selectSubject(subject) }) { Text(subject.name) }
+                            OutlinedButton(
+                                onClick = { viewModel.selectSubject(subject) },
+                                modifier = Modifier.semantics { role = Role.RadioButton; selected = false }
+                            ) { Text(subject.name, maxLines = 1) }
                         }
                     }
                 }
             }
 
-            OutlinedTextField(value = state.title, onValueChange = viewModel::onTitleChange, label = { Text("Название") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = state.sourceLabel, onValueChange = viewModel::onSourceLabelChange, label = { Text("Источник") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = state.text, onValueChange = viewModel::onTextChange, label = { Text("Текст материала") }, minLines = 6, maxLines = 12, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value = state.title,
+                onValueChange = viewModel::onTitleChange,
+                label = { Text("Название") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().focusRequester(titleFocus)
+            )
+            OutlinedTextField(
+                value = state.sourceLabel,
+                onValueChange = viewModel::onSourceLabelChange,
+                label = { Text("Источник") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = state.text,
+                onValueChange = viewModel::onTextChange,
+                label = { Text("Текст материала") },
+                minLines = 6,
+                maxLines = 12,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = viewModel::save) { Text("Сохранить") }
@@ -163,29 +222,63 @@ private fun MaterialCard(
 ) {
     val keyFacts = parseKeyFacts(material.keyFactsJson)
     val body = material.rawText?.takeIf { it.isNotBlank() } ?: material.summaryText
+    val title = material.title
+
     Card(modifier = Modifier.fillMaxWidth()) {
+        // Внешний Column НЕ mergeDescendants: иначе кнопки слились бы в один фокус.
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(text = material.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            material.sourceLabel?.let { source ->
-                Text(text = "Источник: $source", style = MaterialTheme.typography.bodySmall)
-            }
-            Text(text = "Источник данных: ${UserLanguageMapper.toUserSource(material.source)}", style = MaterialTheme.typography.bodySmall)
-            Text(text = body, style = MaterialTheme.typography.bodyMedium, maxLines = 8, overflow = TextOverflow.Ellipsis)
-            if (keyFacts.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(text = "Ключевые факты:", style = MaterialTheme.typography.labelLarge)
-                keyFacts.take(4).forEach { fact ->
-                    Text(text = "• $fact", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+
+            // 1.3: описательный под-блок — один узел доступности (mergeDescendants как ПАРАМЕТР semantics).
+            Column(modifier = Modifier.semantics(mergeDescendants = true) { }) {
+                // 3.2: заголовок материала помечен как heading.
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() }
+                )
+                material.sourceLabel?.let { source ->
+                    Text(text = "Источник: $source", style = MaterialTheme.typography.bodySmall)
+                }
+                Text(
+                    text = "Источник данных: ${UserLanguageMapper.toUserSource(material.source)}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(text = body, style = MaterialTheme.typography.bodyMedium, maxLines = 8, overflow = TextOverflow.Ellipsis)
+                if (keyFacts.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(text = "Ключевые факты:", style = MaterialTheme.typography.labelLarge)
+                    keyFacts.take(4).forEach { fact ->
+                        Text(text = "• $fact", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
+
             Spacer(modifier = Modifier.height(4.dp))
+
+            // 1.1: contentDescription = глагол + контекст материала (TalkBack не теряет смысл действия).
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onStartReview, modifier = Modifier.fillMaxWidth()) { Text("Повторить карточки") }
-                OutlinedButton(onClick = onAsk, modifier = Modifier.fillMaxWidth()) { Text("Спросить по материалу") }
+                Button(
+                    onClick = onStartReview,
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Повторить карточки для материала $title" }
+                ) { Text("Повторить карточки") }
+
+                OutlinedButton(
+                    onClick = onAsk,
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Задать вопрос по материалу $title" }
+                ) { Text("Спросить по материалу") }
+
                 if (material.source == "LOCAL") {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onEdit) { Text("Редактировать") }
-                        OutlinedButton(onClick = onDelete) { Text("Удалить") }
+                        OutlinedButton(
+                            onClick = onEdit,
+                            modifier = Modifier.semantics { contentDescription = "Редактировать материал $title" }
+                        ) { Text("Редактировать", maxLines = 1) }
+                        OutlinedButton(
+                            onClick = onDelete,
+                            modifier = Modifier.semantics { contentDescription = "Удалить материал $title" }
+                        ) { Text("Удалить", maxLines = 1) }
                     }
                 }
             }

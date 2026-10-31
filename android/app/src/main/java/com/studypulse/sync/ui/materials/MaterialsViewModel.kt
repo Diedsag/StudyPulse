@@ -39,17 +39,12 @@ class MaterialsViewModel(
     init {
         viewModelScope.launch {
             studyRepository.materials.collect { materials ->
-                _uiState.update { currentState ->
-                    currentState.copy(materials = materials)
-                }
+                _uiState.update { currentState -> currentState.copy(materials = materials) }
             }
         }
-
         viewModelScope.launch {
             localRepository.subjects.collect { subjects ->
-                _uiState.update { currentState ->
-                    currentState.copy(subjects = subjects)
-                }
+                _uiState.update { currentState -> currentState.copy(subjects = subjects) }
             }
         }
     }
@@ -76,7 +71,6 @@ class MaterialsViewModel(
             }
             return
         }
-
         _uiState.update { currentState ->
             currentState.copy(
                 isFormOpen = true,
@@ -93,43 +87,29 @@ class MaterialsViewModel(
 
     fun toggleForm() {
         _uiState.update { currentState ->
-            currentState.copy(
-                isFormOpen = !currentState.isFormOpen,
-                message = null
-            )
+            currentState.copy(isFormOpen = !currentState.isFormOpen, message = null)
         }
     }
 
     fun selectSubject(subject: SubjectEntity?) {
         _uiState.update { currentState ->
-            currentState.copy(
-                selectedSubjectId = subject?.id,
-                subjectName = subject?.name.orEmpty()
-            )
+            currentState.copy(selectedSubjectId = subject?.id, subjectName = subject?.name.orEmpty())
         }
     }
 
-    fun onTitleChange(value: String) {
-        _uiState.update { currentState ->
-            currentState.copy(title = value)
-        }
-    }
-
-    fun onSourceLabelChange(value: String) {
-        _uiState.update { currentState ->
-            currentState.copy(sourceLabel = value)
-        }
-    }
-
-    fun onTextChange(value: String) {
-        _uiState.update { currentState ->
-            currentState.copy(text = value)
-        }
-    }
+    fun onTitleChange(value: String) { _uiState.update { it.copy(title = value) } }
+    fun onSourceLabelChange(value: String) { _uiState.update { it.copy(sourceLabel = value) } }
+    fun onTextChange(value: String) { _uiState.update { it.copy(text = value) } }
 
     fun save() {
         viewModelScope.launch {
             val state = _uiState.value
+
+            // 2.2-guard: пустое название не сохраняем, форму НЕ закрываем.
+            if (state.title.isBlank()) {
+                _uiState.update { it.copy(message = "Укажите название материала") }
+                return@launch
+            }
 
             val result = if (state.editingExternalId == null) {
                 localRepository.createMaterial(
@@ -160,9 +140,7 @@ class MaterialsViewModel(
                         )
                     },
                     onFailure = { error ->
-                        currentState.copy(
-                            message = error.message ?: "Не удалось сохранить материал"
-                        )
+                        currentState.copy(message = error.message ?: "Не удалось сохранить материал")
                     }
                 )
             }
@@ -172,16 +150,11 @@ class MaterialsViewModel(
     fun delete(material: MaterialEntity) {
         viewModelScope.launch {
             val result = localRepository.deleteMaterial(material.externalId)
-
             _uiState.update { currentState ->
                 result.fold(
-                    onSuccess = {
-                        currentState.copy(message = "Материал удалён")
-                    },
+                    onSuccess = { currentState.copy(message = "Материал удалён") },
                     onFailure = { error ->
-                        currentState.copy(
-                            message = error.message ?: "Не удалось удалить материал"
-                        )
+                        currentState.copy(message = error.message ?: "Не удалось удалить материал")
                     }
                 )
             }
