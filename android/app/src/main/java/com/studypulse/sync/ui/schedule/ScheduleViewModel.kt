@@ -34,20 +34,20 @@ data class ScheduleUiState(
 )
 
 class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
-
     private val container = (application as StudyPulseApplication).container
     private val studyRepository = container.studyRepository
     private val localRepository = container.localRepository
-
     private val _uiState = MutableStateFlow(ScheduleUiState())
     val uiState: StateFlow<ScheduleUiState> = _uiState.asStateFlow()
-
     private var undoAction: (suspend () -> Unit)? = null
 
     init {
         viewModelScope.launch {
             studyRepository.upcomingOccurrences(daysAhead = 7).collect { occurrences ->
-                _uiState.update { it.copy(occurrences = occurrences) }
+                val sorted = runCatching {
+                    occurrences.sortedWith(compareBy({ it.date }, { it.startTime }))
+                }.getOrDefault(occurrences)
+                _uiState.update { it.copy(occurrences = sorted) }
             }
         }
         viewModelScope.launch {
