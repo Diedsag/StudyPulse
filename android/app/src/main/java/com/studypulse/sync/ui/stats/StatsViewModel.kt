@@ -142,14 +142,11 @@ class StatsViewModel(
             try {
                 val current = selectedPeriod.value
                 val other = if (current == "week") "all" else "week"
-                val periods = listOf(current, other).distinct()
-
                 val errors = mutableListOf<String>()
 
-                for (period in periods) {
-                    val result = repository.refresh(period)
-                    result.exceptionOrNull()?.let { error ->
-                        errors += error.message ?: "Не удалось обновить период $period"
+                for (p in listOf(current, other).distinct()) {
+                    repository.refresh(p).exceptionOrNull()?.let { error ->
+                        errors += error.message ?: "Не удалось обновить период $p"
                     }
                 }
 
