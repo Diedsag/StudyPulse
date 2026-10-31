@@ -5,7 +5,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.studypulse.sync.StudyPulseApplication
 import com.studypulse.sync.data.backup.BackupInfo
-import com.studypulse.sync.notifications.NotificationScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,6 +15,12 @@ data class SettingsUiState(
     val displayName: String = "",
     val profileNotificationsEnabled: Boolean = true,
     val autoPlanEnabled: Boolean = true,
+    val slotRemindersEnabled: Boolean = true,
+    val deadlineRemindersEnabled: Boolean = true,
+    val morningDigestEnabled: Boolean = true,
+    val quietHoursEnabled: Boolean = false,
+    val quietHoursStart: Int = 23,
+    val quietHoursEnd: Int = 7,
     val profileLoaded: Boolean = false,
     val serverUrl: String = "",
     val nickname: String = "",
@@ -42,6 +47,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val settingsRepository = container.settingsRepository
     private val profileRepository = container.profileRepository
     private val backupManager = container.backupManager
+    private val reminderScheduler = container.reminderScheduler
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -60,9 +66,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         ratingOptIn = s.ratingOptIn
                     )
                 }
-            } catch (_: Throwable) {
-                // ignore, defaults stay
-            }
+            } catch (_: Throwable) { }
         }
 
         viewModelScope.launch {
@@ -72,6 +76,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         displayName = p.displayName,
                         profileNotificationsEnabled = p.notificationsEnabled,
                         autoPlanEnabled = p.autoPlanEnabled,
+                        slotRemindersEnabled = p.slotRemindersEnabled,
+                        deadlineRemindersEnabled = p.deadlineRemindersEnabled,
+                        morningDigestEnabled = p.morningDigestEnabled,
+                        quietHoursEnabled = p.quietHoursEnabled,
+                        quietHoursStart = p.quietHoursStart,
+                        quietHoursEnd = p.quietHoursEnd,
                         profileLoaded = true
                     )
                 }
@@ -89,26 +99,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun createBackup() {
         viewModelScope.launch {
             _uiState.update { it.copy(isCreatingBackup = true, message = null) }
-
             val result = backupManager.createBackup()
-
             _uiState.update { currentState ->
                 result.fold(
-                    onSuccess = { path ->
-                        currentState.copy(
-                            isCreatingBackup = false,
-                            message = "Резервная копия создана"
-                        )
-                    },
-                    onFailure = { error ->
-                        currentState.copy(
-                            isCreatingBackup = false,
-                            message = "Не удалось создать копию: ${error.message}"
-                        )
-                    }
+                    onSuccess = { currentState.copy(isCreatingBackup = false, message = "Резервная копия создана") },
+                    onFailure = { error -> currentState.copy(isCreatingBackup = false, message = "Не удалось создать копию: ${error.message}") }
                 )
             }
-
             loadBackups()
         }
     }
@@ -116,23 +113,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun restoreBackup(backupPath: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isRestoringBackup = true, message = null) }
-
             val result = backupManager.restoreBackup(backupPath)
-
             _uiState.update { currentState ->
                 result.fold(
-                    onSuccess = {
-                        currentState.copy(
-                            isRestoringBackup = false,
-                            message = "Данные восстановлены. Перезапустите приложение."
-                        )
-                    },
-                    onFailure = { error ->
-                        currentState.copy(
-                            isRestoringBackup = false,
-                            message = "Не удалось восстановить: ${error.message}"
-                        )
-                    }
+                    onSuccess = { currentState.copy(isRestoringBackup = false, message = "Данные восстановлены. Перезапустите приложение.") },
+                    onFailure = { error -> currentState.copy(isRestoringBackup = false, message = "Не удалось восстановить: ${error.message}") }
                 )
             }
         }
@@ -141,12 +126,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun deleteBackup(backupPath: String) {
         viewModelScope.launch {
             val result = backupManager.deleteBackup(backupPath)
-
             result.fold(
                 onSuccess = { loadBackups() },
-                onFailure = { error ->
-                    _uiState.update { it.copy(message = "Не удалось удалить: ${error.message}") }
-                }
+                onFailure = { error -> _uiState.update { it.copy(message = "Не удалось удалить: ${error.message}") } }
             )
         }
     }
@@ -155,16 +137,72 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             profileRepository.setNotificationsEnabled(value)
             if (value) {
-                NotificationScheduler.schedulePeriodicNotifications(getApplication())
+                reminderScheduler.scheduleMorningDigest()
+                reminderScheduler.scheduleForToday()
+                reminderScheduler.scheduleDeadlineReminders()
             } else {
-                NotificationScheduler.cancelNotifications(getApplication())
+                reminderScheduler.cancelAll()
             }
         }
     }
 
     fun toggleAutoPlan(value: Boolean) {
+        viewModelScope.launch { profileRepository.setAutoPlanEnabled(value) }
+    }
+
+    fun toggleSlotReminders(value: Boolean) {
         viewModelScope.launch {
-            profileRepository.setAutoPlanEnabled(value)
+            profileRepository.setSlotRemindersEnabled(value)
+            if (value) reminderScheduler.scheduleForToday()
+        }
+    }
+
+    fun toggleDeadlineReminders(value: Boolean) {
+        viewModelScope.launch {
+            profileRepository.setDeadlineRemindersEnabled(value)
+            if (value) reminderScheduler.scheduleDeadlineReminders()
+        }
+    }
+
+    fun toggleMorningDigest(value: Boolean) {
+        viewModelScope.launch {
+            profileRepository.setMorningDigestEnabled(value)
+            reminderScheduler.scheduleMorningDigest()
+        }
+    }
+
+    fun toggleQuietHours(value: Boolean) {
+        viewModelScope.launch {
+            val s = _uiState.value
+            profileRepository.setQuietHours(value, s.quietHoursStart, s.quietHoursEnd)
+        }
+    }
+
+    fun incrementQuietStart() {
+        viewModelScope.launch {
+            val s = _uiState.value
+            profileRepository.setQuietHours(s.quietHoursEnabled, (s.quietHoursStart + 1) % 24, s.quietHoursEnd)
+        }
+    }
+
+    fun decrementQuietStart() {
+        viewModelScope.launch {
+            val s = _uiState.value
+            profileRepository.setQuietHours(s.quietHoursEnabled, (s.quietHoursStart + 23) % 24, s.quietHoursEnd)
+        }
+    }
+
+    fun incrementQuietEnd() {
+        viewModelScope.launch {
+            val s = _uiState.value
+            profileRepository.setQuietHours(s.quietHoursEnabled, s.quietHoursStart, (s.quietHoursEnd + 1) % 24)
+        }
+    }
+
+    fun decrementQuietEnd() {
+        viewModelScope.launch {
+            val s = _uiState.value
+            profileRepository.setQuietHours(s.quietHoursEnabled, s.quietHoursStart, (s.quietHoursEnd + 23) % 24)
         }
     }
 

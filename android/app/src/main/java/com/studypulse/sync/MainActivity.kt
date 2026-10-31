@@ -66,9 +66,13 @@ fun StudyPulseRoot() {
     val profile by application.container.profileRepository.profile
         .collectAsStateWithLifecycle(initialValue = StudentProfile())
 
-    LaunchedEffect(profile.onboardingCompleted, profile.autoPlanEnabled) {
-        if (profile.onboardingCompleted && profile.autoPlanEnabled) {
-            application.container.autoPlannerCoordinator.ensureTodayPlan()
+    LaunchedEffect(profile.onboardingCompleted, profile.autoPlanEnabled, profile.notificationsEnabled) {
+        if (profile.onboardingCompleted) {
+            if (profile.autoPlanEnabled) {
+                application.container.autoPlannerCoordinator.ensureTodayPlan()
+            }
+            application.container.reminderScheduler.scheduleForToday()
+            application.container.reminderScheduler.scheduleDeadlineReminders()
         }
     }
 

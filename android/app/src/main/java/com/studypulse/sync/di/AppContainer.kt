@@ -19,6 +19,7 @@ import com.studypulse.sync.data.repository.StatsRepository
 import com.studypulse.sync.data.repository.StudyRepository
 import com.studypulse.sync.data.repository.SyncRepository
 import com.studypulse.sync.domain.planning.AutoPlannerCoordinator
+import com.studypulse.sync.notifications.ReminderScheduler
 
 class AppContainer(context: Context) {
 
@@ -41,6 +42,9 @@ class AppContainer(context: Context) {
 
     val backupManager: BackupManager =
         BackupManager(context, planExporter)
+
+    val reminderScheduler: ReminderScheduler =
+        ReminderScheduler(context)
 
     val packageRepository: PackageRepository =
         PackageRepositoryImpl(

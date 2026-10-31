@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -64,37 +65,19 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleMedium
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Напоминания", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            text = "О занятиях и дедлайнах",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(checked = state.profileNotificationsEnabled, onCheckedChange = viewModel::toggleProfileNotifications)
-                }
+                SwitchRow(
+                    title = "Напоминания",
+                    subtitle = "О занятиях и дедлайнах",
+                    checked = state.profileNotificationsEnabled,
+                    onCheckedChange = viewModel::toggleProfileNotifications
+                )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Автоплан", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            text = "Предлагать учебные слоты самому",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(checked = state.autoPlanEnabled, onCheckedChange = viewModel::toggleAutoPlan)
-                }
+                SwitchRow(
+                    title = "Автоплан",
+                    subtitle = "Предлагать учебные слоты самому",
+                    checked = state.autoPlanEnabled,
+                    onCheckedChange = viewModel::toggleAutoPlan
+                )
 
                 Spacer(modifier = Modifier.height(2.dp))
 
@@ -103,6 +86,65 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+
+        if (state.profileNotificationsEnabled) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(text = "Типы напоминаний", style = MaterialTheme.typography.titleMedium)
+
+                    SwitchRow(
+                        title = "Учебные слоты",
+                        subtitle = "За 15 минут до занятия",
+                        checked = state.slotRemindersEnabled,
+                        onCheckedChange = viewModel::toggleSlotReminders
+                    )
+
+                    SwitchRow(
+                        title = "Дедлайны",
+                        subtitle = "За 24 часа и за 3 часа",
+                        checked = state.deadlineRemindersEnabled,
+                        onCheckedChange = viewModel::toggleDeadlineReminders
+                    )
+
+                    SwitchRow(
+                        title = "Утренний дайджест",
+                        subtitle = "Сводка плана в 07:00",
+                        checked = state.morningDigestEnabled,
+                        onCheckedChange = viewModel::toggleMorningDigest
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    SwitchRow(
+                        title = "Тихие часы",
+                        subtitle = "Не будить ночью",
+                        checked = state.quietHoursEnabled,
+                        onCheckedChange = viewModel::toggleQuietHours
+                    )
+
+                    if (state.quietHoursEnabled) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CounterCell(
+                                label = "С",
+                                value = "${state.quietHoursStart.toString().padStart(2, '0')}:00",
+                                onDecrement = viewModel::decrementQuietStart,
+                                onIncrement = viewModel::incrementQuietStart
+                            )
+                            CounterCell(
+                                label = "До",
+                                value = "${state.quietHoursEnd.toString().padStart(2, '0')}:00",
+                                onDecrement = viewModel::decrementQuietEnd,
+                                onIncrement = viewModel::incrementQuietEnd
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -130,7 +172,6 @@ fun SettingsScreen(
                 if (state.backups.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(text = "Доступные копии:", style = MaterialTheme.typography.labelMedium)
-
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -145,9 +186,7 @@ fun SettingsScreen(
                     }
                 }
 
-                state.message?.let {
-                    Text(text = it, style = MaterialTheme.typography.bodySmall)
-                }
+                state.message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
             }
         }
 
@@ -172,9 +211,7 @@ fun SettingsScreen(
                     }
                 },
                 dismissButton = {
-                    OutlinedButton(onClick = { restoreDialogBackup = null }) {
-                        Text("Отмена")
-                    }
+                    OutlinedButton(onClick = { restoreDialogBackup = null }) { Text("Отмена") }
                 }
             )
         }
@@ -244,6 +281,52 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun SwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun CounterCell(
+    label: String,
+    value: String,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = label, style = MaterialTheme.typography.labelMedium)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(onClick = onDecrement) { Text("−") }
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.width(64.dp),
+                textAlign = TextAlign.Center
+            )
+            OutlinedButton(onClick = onIncrement) { Text("+") }
+        }
+    }
+}
+
+@Composable
 private fun BackupItem(
     backup: BackupInfo,
     onRestore: () -> Unit,
@@ -256,24 +339,16 @@ private fun BackupItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = backup.formattedDate(),
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Text(text = backup.formattedDate(), style = MaterialTheme.typography.bodyMedium)
                 Text(
                     text = backup.formattedSize(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onRestore) {
-                    Text("Восстановить")
-                }
-                OutlinedButton(onClick = onDelete) {
-                    Text("Удалить")
-                }
+                OutlinedButton(onClick = onRestore) { Text("Восстановить") }
+                OutlinedButton(onClick = onDelete) { Text("Удалить") }
             }
         }
     }

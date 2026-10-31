@@ -280,6 +280,9 @@ interface StudySlotDao {
     )
     suspend fun getUpcomingSlotsOnce(startMillis: Long, endMillis: Long): List<SlotWithTaskMaterial>
 
+    @Query("SELECT * FROM study_slots WHERE id = :id")
+    suspend fun getByIdOnce(id: Long): StudySlotEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<StudySlotEntity>)
 
