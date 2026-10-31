@@ -36,17 +36,14 @@ import com.studypulse.sync.ui.stats.StatsScreen
 import com.studypulse.sync.ui.subjects.SubjectScreen
 import com.studypulse.sync.ui.tasks.TasksScreen
 import com.studypulse.sync.ui.theme.StudyPulseTheme
+import com.studypulse.sync.ui.today.TodayScreen
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
         setContent {
-            StudyPulseTheme {
-                StudyPulseApp()
-            }
+            StudyPulseTheme { StudyPulseApp() }
         }
     }
 }
@@ -59,54 +56,30 @@ fun StudyPulseApp() {
     var focusSlotId by remember { mutableStateOf<Long?>(null) }
     var qaMaterialId by remember { mutableStateOf<String?>(null) }
 
-    val tabs = listOf(
-        "Пакеты",
-        "Предметы",
-        "Расписание",
-        "Задания",
-        "План",
-        "Материалы",
-        "Статистика",
-        "Настройки"
-    )
+    val tabs = listOf("Сегодня", "Пакеты", "Предметы", "Расписание", "Задания", "План", "Материалы", "Статистика", "Настройки")
+
+    fun clearOverlays() {
+        reviewRequest = null
+        focusSlotId = null
+        qaMaterialId = null
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "StudyPulse",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            )
+            TopAppBar(title = { Text(text = "StudyPulse", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-        ) {
+        Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             val currentReview = reviewRequest
             val currentFocusSlotId = focusSlotId
             val currentQaMaterialId = qaMaterialId
 
             if (currentReview != null) {
-                ReviewScreen(
-                    request = currentReview,
-                    onExit = { reviewRequest = null }
-                )
+                ReviewScreen(request = currentReview, onExit = { reviewRequest = null })
             } else if (currentFocusSlotId != null) {
-                FocusTimerScreen(
-                    slotId = currentFocusSlotId,
-                    onExit = { focusSlotId = null }
-                )
+                FocusTimerScreen(slotId = currentFocusSlotId, onExit = { focusSlotId = null })
             } else if (currentQaMaterialId != null) {
-                QaScreen(
-                    materialExternalId = currentQaMaterialId,
-                    onExit = { qaMaterialId = null }
-                )
+                QaScreen(materialExternalId = currentQaMaterialId, onExit = { qaMaterialId = null })
             } else {
                 ScrollableTabRow(
                     selectedTabIndex = selectedTab,
@@ -119,57 +92,34 @@ fun StudyPulseApp() {
                             selected = selectedTab == index,
                             onClick = { selectedTab = index },
                             text = {
-                                Text(
-                                    text = title,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.labelLarge
-                                )
+                                Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
                             },
                             modifier = Modifier.padding(horizontal = 12.dp)
                         )
                     }
                 }
 
-                Column(
-                    modifier = Modifier.fillMaxSize()
-                ) {
+                Column(modifier = Modifier.fillMaxSize()) {
                     when (selectedTab) {
-                        0 -> PackagesScreen()
-
-                        1 -> SubjectScreen()
-
-                        2 -> ScheduleScreen()
-
-                        3 -> TasksScreen(
-                            onOpenPlanner = {
-                                selectedTab = 4
-                                reviewRequest = null
-                                focusSlotId = null
-                                qaMaterialId = null
-                            }
+                        0 -> TodayScreen(
+                            onOpenFocus = { slotId -> focusSlotId = slotId },
+                            onStartReview = { request -> reviewRequest = request },
+                            onGoToPlan = { selectedTab = 5 },
+                            onGoToTasks = { selectedTab = 4 }
                         )
-
-                        4 -> PlanScreen(
-                            onStartReview = { request ->
-                                reviewRequest = request
-                            },
-                            onOpenFocus = { slotId ->
-                                focusSlotId = slotId
-                            }
+                        1 -> PackagesScreen()
+                        2 -> SubjectScreen()
+                        3 -> ScheduleScreen()
+                        4 -> TasksScreen(onOpenPlanner = { selectedTab = 5; clearOverlays() })
+                        5 -> PlanScreen(
+                            onStartReview = { request -> reviewRequest = request },
+                            onOpenFocus = { slotId -> focusSlotId = slotId }
                         )
-
-                        5 -> MaterialsScreen(
-                            onStartReview = { request ->
-                                reviewRequest = request
-                            },
-                            onAsk = { materialId ->
-                                qaMaterialId = materialId
-                            }
+                        6 -> MaterialsScreen(
+                            onStartReview = { request -> reviewRequest = request },
+                            onAsk = { materialId -> qaMaterialId = materialId }
                         )
-
-                        6 -> StatsScreen()
-
+                        7 -> StatsScreen()
                         else -> SettingsScreen()
                     }
                 }

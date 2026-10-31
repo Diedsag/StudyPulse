@@ -2,6 +2,8 @@ package com.studypulse.sync.ui.plan
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,9 +30,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.studypulse.sync.data.local.dao.SlotWithTaskMaterial
 import com.studypulse.sync.ui.review.ReviewRequest
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PlanScreen(
     onStartReview: (ReviewRequest) -> Unit = {},
@@ -38,125 +42,57 @@ fun PlanScreen(
     viewModel: PlanViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val busy = state.isGenerating || state.isReplanning || state.isAccepting
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = viewModel::generatePlan,
-                enabled = !state.isGenerating && !state.isAccepting && state.completingSlotId == null
-            ) {
-                Text("Сгенерировать план")
-            }
-
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = viewModel::generatePlan, enabled = !busy) { Text("Сгенерировать план") }
             Button(
                 onClick = viewModel::acceptPlan,
-                enabled = state.proposedSlots.isNotEmpty() &&
-                    !state.isGenerating &&
-                    !state.isAccepting &&
-                    state.completingSlotId == null
-            ) {
-                Text("Принять план")
-            }
-
-            if (state.isGenerating || state.isAccepting) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp))
-            }
+                enabled = state.proposedSlots.isNotEmpty() && !busy
+            ) { Text("Принять план") }
+            OutlinedButton(onClick = viewModel::replan, enabled = !busy) { Text("Перепланировать") }
+            if (busy) CircularProgressIndicator(modifier = Modifier.size(18.dp))
         }
 
-        state.message?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
+        state.message?.let { Text(text = it, style = MaterialTheme.typography.bodyLarge) }
 
         if (state.warnings.isNotEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "Внимание",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-
-                    state.warnings.forEach { warning ->
-                        Text(
-                            text = warning,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(text = "Внимание", style = MaterialTheme.typography.titleSmall)
+                    state.warnings.forEach { w ->
+                        Text(text = w, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
         }
 
         if (state.proposedSlots.isEmpty() && state.plannedSlots.isEmpty()) {
-            Text(
-                text = "Слотов пока нет. Скачай пакет, построй план и прими его.",
-                style = MaterialTheme.typography.bodyLarge
-            )
+            Text(text = "Слотов пока нет. Скачай пакет или добавь задания, затем построй план.", style = MaterialTheme.typography.bodyLarge)
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        LazyColumn(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (state.proposedSlots.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "Предложенный план",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-
-                items(
-                    items = state.proposedSlots,
-                    key = { "proposed-${it.slot.id}" }
-                ) { slotWithTask ->
-                    SlotCard(
-                        slotWithTask = slotWithTask,
-                        showActions = false,
-                        isCompleting = false,
-                        onComplete = {},
-                        onStartReview = onStartReview,
-                        onOpenFocus = onOpenFocus
-                    )
+                item { Text(text = "Предложенный план", style = MaterialTheme.typography.titleMedium) }
+                items(state.proposedSlots, key = { "proposed-${it.slot.id}" }) { swt ->
+                    SlotCard(swt, showActions = false, isCompleting = false, onComplete = {}, onStartReview, onOpenFocus)
                 }
             }
-
             if (state.plannedSlots.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = "Принятый план",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Text(text = "Принятый план", style = MaterialTheme.typography.titleMedium)
                 }
-
-                items(
-                    items = state.plannedSlots,
-                    key = { "planned-${it.slot.id}" }
-                ) { slotWithTask ->
+                items(state.plannedSlots, key = { "planned-${it.slot.id}" }) { swt ->
                     SlotCard(
-                        slotWithTask = slotWithTask,
+                        slotWithTask = swt,
                         showActions = true,
-                        isCompleting = state.completingSlotId == slotWithTask.slot.id,
-                        onComplete = {
-                            viewModel.completeSlot(slotWithTask.slot)
-                        },
+                        isCompleting = state.completingSlotId == swt.slot.id,
+                        onComplete = { viewModel.completeSlot(swt.slot) },
                         onStartReview = onStartReview,
                         onOpenFocus = onOpenFocus
                     )
@@ -178,70 +114,45 @@ private fun SlotCard(
     val slot = slotWithTask.slot
     val durationMinutes = ((slot.endDateTime - slot.startDateTime) / 60_000L).toInt()
 
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = formatDate(slot.startDateTime),
-                style = MaterialTheme.typography.labelLarge
-            )
-
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(text = formatDate(slot.startDateTime), style = MaterialTheme.typography.labelLarge)
             Text(
                 text = slotWithTask.taskTitle,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-
-            slotWithTask.taskSubject?.let { subject ->
-                Text(
-                    text = "Предмет: $subject",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+            slotWithTask.taskSubject?.let { Text(text = "Предмет: $it", style = MaterialTheme.typography.bodyMedium) }
+            slotWithTask.materialTitle?.let {
+                Text(text = "Материал: $it", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            Text(text = "${formatTime(slot.startDateTime)}–${formatTime(slot.endDateTime)}", style = MaterialTheme.typography.bodyLarge)
+            Text(text = "Длительность: $durationMinutes мин", style = MaterialTheme.typography.bodyMedium)
 
-            slotWithTask.materialTitle?.let { materialTitle ->
-                Text(
-                    text = "Материал: $materialTitle",
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
+            // Почему предложен этот слот
+            val deadline = slotWithTask.taskDeadline
+            val priority = slotWithTask.taskPriority
+            val reasonParts = mutableListOf<String>()
+            if (!deadline.isNullOrBlank()) reasonParts += "дедлайн ${formatDate(deadline)}"
+            reasonParts += "приоритет ${priorityLabel(priority)}"
             Text(
-                text = "${formatTime(slot.startDateTime)}–${formatTime(slot.endDateTime)}",
-                style = MaterialTheme.typography.bodyLarge
+                text = "Почему здесь: " + reasonParts.joinToString(", "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Text(
-                text = "Длительность: $durationMinutes мин",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            Text(
-                text = "Статус: ${slot.status}",
-                color = MaterialTheme.colorScheme.primary
-            )
+            Text(text = "Статус: ${slot.status}", color = MaterialTheme.colorScheme.primary)
 
             if (showActions) {
                 Spacer(modifier = Modifier.height(4.dp))
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = onComplete,
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = onComplete, enabled = !isCompleting, modifier = Modifier.fillMaxWidth()) { Text("Выполнено") }
+                    OutlinedButton(
+                        onClick = { onOpenFocus(slot.id) },
                         enabled = !isCompleting,
                         modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Выполнено")
-                    }
-
+                    ) { Text("Фокус-таймер") }
                     OutlinedButton(
                         onClick = {
                             onStartReview(
@@ -253,23 +164,9 @@ private fun SlotCard(
                         },
                         enabled = !isCompleting,
                         modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Повторить карточки")
-                    }
-
-                    OutlinedButton(
-                        onClick = { onOpenFocus(slot.id) },
-                        enabled = !isCompleting,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Фокус-таймер")
-                    }
-
+                    ) { Text("Повторить карточки") }
                     if (isCompleting) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp))
                             Text("Сохраняем...")
                         }
@@ -280,20 +177,22 @@ private fun SlotCard(
     }
 }
 
-private fun formatDate(epochMillis: Long): String {
-    val date = Instant
-        .ofEpochMilli(epochMillis)
-        .atZone(ZoneId.systemDefault())
-        .toLocalDate()
-
-    return date.format(DateTimeFormatter.ofPattern("dd.MM"))
+private fun priorityLabel(priority: Int?): String = when (priority) {
+    1 -> "низкий"
+    3 -> "высокий"
+    else -> "средний"
 }
 
-private fun formatTime(epochMillis: Long): String {
-    val time = Instant
-        .ofEpochMilli(epochMillis)
-        .atZone(ZoneId.systemDefault())
-        .toLocalTime()
+private fun formatDate(epochMillis: Long): String =
+    Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
+        .toLocalDate().format(DateTimeFormatter.ofPattern("dd.MM"))
 
-    return time.format(DateTimeFormatter.ofPattern("HH:mm"))
+private fun formatTime(epochMillis: Long): String =
+    Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
+        .toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))
+
+private fun formatDate(raw: String): String = try {
+    LocalDate.parse(raw).format(DateTimeFormatter.ofPattern("dd.MM"))
+} catch (_: Throwable) {
+    raw
 }

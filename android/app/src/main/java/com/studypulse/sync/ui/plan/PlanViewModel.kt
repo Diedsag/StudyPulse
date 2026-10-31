@@ -16,15 +16,14 @@ data class PlanUiState(
     val proposedSlots: List<SlotWithTaskMaterial> = emptyList(),
     val plannedSlots: List<SlotWithTaskMaterial> = emptyList(),
     val isGenerating: Boolean = false,
+    val isReplanning: Boolean = false,
     val isAccepting: Boolean = false,
     val completingSlotId: Long? = null,
     val message: String? = null,
     val warnings: List<String> = emptyList()
 )
 
-class PlanViewModel(
-    application: Application
-) : AndroidViewModel(application) {
+class PlanViewModel(application: Application) : AndroidViewModel(application) {
 
     private val container = (application as StudyPulseApplication).container
     private val repository = container.studyRepository
@@ -34,48 +33,50 @@ class PlanViewModel(
 
     init {
         viewModelScope.launch {
+            repository.markMissedSlots()
+        }
+        viewModelScope.launch {
             repository.proposedSlots.collect { slots ->
-                _uiState.update { currentState ->
-                    currentState.copy(proposedSlots = slots)
-                }
+                _uiState.update { it.copy(proposedSlots = slots) }
             }
         }
-
         viewModelScope.launch {
             repository.plannedSlots.collect { slots ->
-                _uiState.update { currentState ->
-                    currentState.copy(plannedSlots = slots)
-                }
+                _uiState.update { it.copy(plannedSlots = slots) }
             }
         }
     }
 
-    fun generatePlan() {
-        viewModelScope.launch {
-            if (_uiState.value.isGenerating) return@launch
+    fun generatePlan() = runPlanGeneration(replan = false)
 
-            _uiState.update { currentState ->
-                currentState.copy(
-                    isGenerating = true,
-                    message = null,
-                    warnings = emptyList()
-                )
+    fun replan() = runPlanGeneration(replan = true)
+
+    private fun runPlanGeneration(replan: Boolean) {
+        viewModelScope.launch {
+            val busy = _uiState.value.isGenerating || _uiState.value.isReplanning || _uiState.value.isAccepting
+            if (busy) return@launch
+
+            _uiState.update {
+                if (replan) it.copy(isReplanning = true, message = null, warnings = emptyList())
+                else it.copy(isGenerating = true, message = null, warnings = emptyList())
             }
 
-            val result = repository.generatePlan()
+            val result = if (replan) repository.replan() else repository.generatePlan()
 
-            _uiState.update { currentState ->
+            _uiState.update { current ->
                 result.fold(
                     onSuccess = { planResult ->
-                        currentState.copy(
+                        current.copy(
                             isGenerating = false,
+                            isReplanning = false,
                             message = "Создано слотов: ${planResult.slotsCount}",
                             warnings = planResult.warnings
                         )
                     },
                     onFailure = { error ->
-                        currentState.copy(
+                        current.copy(
                             isGenerating = false,
+                            isReplanning = false,
                             message = error.message ?: "Не удалось построить план"
                         )
                     }
@@ -87,37 +88,19 @@ class PlanViewModel(
     fun acceptPlan() {
         viewModelScope.launch {
             if (_uiState.value.isAccepting) return@launch
-
             if (_uiState.value.proposedSlots.isEmpty()) {
-                _uiState.update { currentState ->
-                    currentState.copy(message = "Сначала построй план")
-                }
+                _uiState.update { it.copy(message = "Сначала построй план") }
                 return@launch
             }
-
-            _uiState.update { currentState ->
-                currentState.copy(
-                    isAccepting = true,
-                    message = null
-                )
-            }
-
+            _uiState.update { it.copy(isAccepting = true, message = null) }
             val result = repository.acceptPlan()
-
-            _uiState.update { currentState ->
+            _uiState.update { current ->
                 result.fold(
                     onSuccess = { count ->
-                        currentState.copy(
-                            isAccepting = false,
-                            message = "Принято слотов: $count",
-                            warnings = emptyList()
-                        )
+                        current.copy(isAccepting = false, message = "Принято слотов: $count", warnings = emptyList())
                     },
                     onFailure = { error ->
-                        currentState.copy(
-                            isAccepting = false,
-                            message = error.message ?: "Не удалось принять план"
-                        )
+                        current.copy(isAccepting = false, message = error.message ?: "Не удалось принять план")
                     }
                 )
             }
@@ -127,36 +110,20 @@ class PlanViewModel(
     fun completeSlot(slot: StudySlotEntity) {
         viewModelScope.launch {
             if (_uiState.value.completingSlotId != null) return@launch
-
-            _uiState.update { currentState ->
-                currentState.copy(
-                    completingSlotId = slot.id,
-                    message = null
-                )
-            }
-
+            _uiState.update { it.copy(completingSlotId = slot.id, message = null) }
             val result = repository.completeSlot(slot)
-
-            _uiState.update { currentState ->
+            _uiState.update { current ->
                 result.fold(
                     onSuccess = { completion ->
-                        val baseMessage =
-                            "Слот выполнен: ${completion.durationMinutes} мин. " +
-                                "Осталось по задаче: ${completion.taskRemainingMinutes} мин."
-
-                        val message = if (completion.taskCompleted) {
-                            "$baseMessage Задание закрыто."
-                        } else {
-                            baseMessage
-                        }
-
-                        currentState.copy(
+                        val base = "Слот выполнен: ${completion.durationMinutes} мин. " +
+                            "Осталось по задаче: ${completion.taskRemainingMinutes} мин."
+                        current.copy(
                             completingSlotId = null,
-                            message = message
+                            message = if (completion.taskCompleted) "$base Задание закрыто." else base
                         )
                     },
                     onFailure = { error ->
-                        currentState.copy(
+                        current.copy(
                             completingSlotId = null,
                             message = error.message ?: "Не удалось отметить слот выполненным"
                         )
