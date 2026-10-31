@@ -1,9 +1,4 @@
 package com.studypulse.sync.ui.stats
-import androidx.lifecycle.LifecycleOwner
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.repeatOnLifecycle
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,11 +18,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.studypulse.sync.core.network.dto.LeaderboardEntryDto
 import java.time.Instant
@@ -38,16 +38,18 @@ import java.time.format.DateTimeFormatter
 fun StatsScreen(
     viewModel: StatsViewModel = viewModel()
 ) {
-        LaunchedEffect(Unit) {
-            try { viewModel.refresh() } catch (_: Throwable) { }
-        }
+    val lifecycleOwner = LocalContext.current as? LifecycleOwner
 
-        val lifecycleOwner = LocalContext.current as? LifecycleOwner
-        LaunchedEffect(lifecycleOwner) {
-            lifecycleOwner?.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                try { viewModel.refresh() } catch (_: Throwable) { }
+    LaunchedEffect(lifecycleOwner) {
+        if (lifecycleOwner != null) {
+            lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                viewModel.refreshAllPeriods()
             }
+        } else {
+            viewModel.refreshAllPeriods()
         }
+    }
+
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LazyColumn(
@@ -164,7 +166,7 @@ fun StatsScreen(
         if (state.leaderboard.isEmpty()) {
             item {
                 Text(
-                    text = "Нет данных рейтинга. Нажми «Обновить», когда сервер доступен.",
+                    text = "Нет данных рейтинга. Данные обновляются автоматически при открытии экрана.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
