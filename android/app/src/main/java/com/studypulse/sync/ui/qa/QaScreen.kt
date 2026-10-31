@@ -1,4 +1,5 @@
 package com.studypulse.sync.ui.qa
+import androidx.compose.runtime.remember
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,8 @@ fun QaScreen(
     onExit: () -> Unit,
     viewModel: QaViewModel = viewModel()
 ) {
+        QaDemoNotice()
+        QaDynamicStatus(state)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
@@ -185,6 +188,156 @@ private fun MessageBubble(
                     Text("Ответить общо")
                 }
             }
+        }
+    }
+}
+
+
+private data class QaDescription(
+    val isLoading: Boolean,
+    val hasError: Boolean,
+    val errorText: String?,
+    val hasAnswer: Boolean,
+    val answerText: String?
+)
+
+private object QaStateInspector {
+    fun describe(state: Any?): QaDescription {
+        if (state == null) {
+            return QaDescription(false, false, null, false, null)
+        }
+
+        var isLoading = false
+        var errorText: String? = null
+        var answerText: String? = null
+
+        val fields = runCatching { state.javaClass.declaredFields }.getOrNull()
+            ?: return QaDescription(false, false, null, false, null)
+
+        for (field in fields) {
+            runCatching {
+                field.isAccessible = true
+                val name = field.name.lowercase()
+                val value = field.get(state)
+
+                if (name.contains("loading") || name.contains("busy") || name.contains("progress")) {
+                    isLoading = (value as? Boolean) ?: isLoading
+                }
+
+                if (name.contains("error") || name.contains("message")) {
+                    val text = value as? String
+                    if (!text.isNullOrBlank()) {
+                        errorText = text
+                    }
+                }
+
+                if (
+                    name.contains("answer") ||
+                    name.contains("response") ||
+                    name.contains("result") ||
+                    name.contains("text")
+                ) {
+                    val text = value as? String
+
+                    if (!text.isNullOrBlank()) {
+                        answerText = text
+                    } else if (value != null) {
+                        answerText = extractNestedString(
+                            obj = value,
+                            keys = arrayOf("answer", "text", "content", "message")
+                        ) ?: answerText
+                    }
+                }
+            }
+        }
+
+        return QaDescription(
+            isLoading = isLoading,
+            hasError = !errorText.isNullOrBlank(),
+            errorText = errorText,
+            hasAnswer = !answerText.isNullOrBlank(),
+            answerText = answerText
+        )
+    }
+
+    private fun extractNestedString(obj: Any, keys: Array<String>): String? {
+        val fields = runCatching { obj.javaClass.declaredFields }.getOrNull() ?: return null
+
+        for (field in fields) {
+            val result = runCatching {
+                field.isAccessible = true
+                val name = field.name.lowercase()
+                val value = field.get(obj)
+
+                if (keys.any { name.contains(it.lowercase()) }) {
+                    value as? String
+                } else {
+                    null
+                }
+            }.getOrNull()
+
+            if (!result.isNullOrBlank()) {
+                return result
+            }
+        }
+
+        return null
+    }
+}
+
+@Composable
+private fun QaDemoNotice() {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "Q&A: демо-поиск по материалам",
+                style = MaterialTheme.typography.titleSmall
+            )
+
+            Text(
+                text = "Сейчас ответы ищутся по ключевым словам в тексте материала. Если вопрос сформулирован другими словами или материал ещё не разбит на фрагменты, ответ может не найтись.",
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            Text(
+                text = "Попробуй добавить больше текста в конспект или переформулировать вопрос ближе к терминам из материала.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun QaDynamicStatus(state: Any?) {
+    val description = remember(state) { QaStateInspector.describe(state) }
+
+    when {
+        description.isLoading -> {
+            Text(
+                text = "Ищу ответ по материалу...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        description.hasError -> {
+            Text(
+                text = "Не получилось ответить: ${description.errorText ?: "неизвестная ошибка"}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+
+        !description.hasAnswer -> {
+            Text(
+                text = "Прямой ответ пока не найден. Это не обязательно ошибка: возможно, в материале нет точных совпадений по ключевым словам.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
