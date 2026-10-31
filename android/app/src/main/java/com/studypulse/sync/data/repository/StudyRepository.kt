@@ -2,7 +2,7 @@ package com.studypulse.sync.data.repository
 
 import androidx.room.withTransaction
 import com.studypulse.sync.data.local.AppDatabase
-import com.studypulse.sync.data.local.dao.SlotWithTask
+import com.studypulse.sync.data.local.dao.SlotWithTaskMaterial
 import com.studypulse.sync.data.local.entity.CardEntity
 import com.studypulse.sync.data.local.entity.ClassInstanceEntity
 import com.studypulse.sync.data.local.entity.MaterialEntity
@@ -14,6 +14,7 @@ import com.studypulse.sync.data.local.entity.TaskEntity
 import com.studypulse.sync.data.srs.SpacedRepetitionScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.time.Duration
@@ -52,6 +53,12 @@ data class ReviewOutcome(
     val intervalDays: Int
 )
 
+data class SlotCompletionResult(
+    val durationMinutes: Int,
+    val taskRemainingMinutes: Int,
+    val taskCompleted: Boolean
+)
+
 class StudyRepository(
     private val database: AppDatabase
 ) {
@@ -71,11 +78,11 @@ class StudyRepository(
     val materials: Flow<List<MaterialEntity>> =
         materialDao.observeDownloaded()
 
-    val proposedSlots: Flow<List<SlotWithTask>> =
-        studySlotDao.observeWithTask("PROPOSED")
+    val proposedSlots: Flow<List<SlotWithTaskMaterial>> =
+        studySlotDao.observeWithTaskMaterial("PROPOSED")
 
-    val plannedSlots: Flow<List<SlotWithTask>> =
-        studySlotDao.observeWithTask("PLANNED")
+    val plannedSlots: Flow<List<SlotWithTaskMaterial>> =
+        studySlotDao.observeWithTaskMaterial("PLANNED")
 
     fun upcomingOccurrences(daysAhead: Int = 7): Flow<List<ClassOccurrence>> {
         return combine(
@@ -105,15 +112,21 @@ class StudyRepository(
     }
 
     suspend fun getDueCards(
+        packageExternalId: String?,
         materialExternalId: String?
     ): Result<List<CardEntity>> {
         return try {
             val now = System.currentTimeMillis()
 
-            val cards = if (materialExternalId.isNullOrBlank()) {
-                cardDao.getDueAllOnce(now)
-            } else {
-                cardDao.getDueByMaterialOnce(materialExternalId, now)
+            val cards = when {
+                !materialExternalId.isNullOrBlank() ->
+                    cardDao.getDueByMaterialOnce(materialExternalId, now)
+
+                !packageExternalId.isNullOrBlank() ->
+                    cardDao.getDueByPackageOnce(packageExternalId, now)
+
+                else ->
+                    cardDao.getDueAllOnce(now)
             }
 
             Result.success(cards)
@@ -134,9 +147,9 @@ class StudyRepository(
             val payloadJson = buildJsonObject {
                 put("package_external_id", card.packageExternalId)
                 put("card_external_id", card.externalId)
-                put("rating", rating)
-                put("previous_interval_days", card.intervalDays)
-                put("new_interval_days", updatedCard.intervalDays)
+                put("rating", JsonPrimitive(rating))
+                put("previous_interval_days", JsonPrimitive(card.intervalDays))
+                put("new_interval_days", JsonPrimitive(updatedCard.intervalDays))
             }.toString()
 
             database.withTransaction {
@@ -209,6 +222,109 @@ class StudyRepository(
         }
     }
 
+    suspend fun completeSlot(
+        slot: StudySlotEntity
+    ): Result<SlotCompletionResult> {
+        return try {
+            if (slot.status != "PLANNED") {
+                return Result.failure(
+                    IllegalStateException("Слот уже не находится в статусе PLANNED")
+                )
+            }
+
+            val durationMinutes = (
+                (slot.endDateTime - slot.startDateTime) / 60_000L
+                ).toInt().coerceAtLeast(0)
+
+            val task = taskDao.getById(slot.taskExternalId)
+                ?: return Result.failure(
+                    IllegalStateException("Задание для слота не найдено")
+                )
+
+            val newRemainingMinutes =
+                (task.remainingMinutes - durationMinutes).coerceAtLeast(0)
+
+            val newTaskStatus = if (newRemainingMinutes == 0) {
+                "DONE"
+            } else {
+                "IN_PROGRESS"
+            }
+
+            val now = System.currentTimeMillis()
+
+            val slotEventId = UUID.randomUUID().toString()
+            val slotPayloadJson = buildJsonObject {
+                put("package_external_id", slot.packageExternalId)
+                put("task_external_id", slot.taskExternalId)
+                put("slot_id", JsonPrimitive(slot.id))
+                put("duration_minutes", JsonPrimitive(durationMinutes))
+            }.toString()
+
+            val taskCompleted = newTaskStatus == "DONE"
+            val taskEventId = if (taskCompleted) UUID.randomUUID().toString() else null
+            val taskPayloadJson = if (taskCompleted) {
+                buildJsonObject {
+                    put("package_external_id", slot.packageExternalId)
+                    put("task_external_id", slot.taskExternalId)
+                    put("effort_minutes", JsonPrimitive(task.effortMinutes))
+                }.toString()
+            } else {
+                null
+            }
+
+            database.withTransaction {
+                studySlotDao.markStatus(
+                    id = slot.id,
+                    status = "DONE"
+                )
+
+                taskDao.updateStatus(
+                    externalId = task.externalId,
+                    status = newTaskStatus,
+                    remainingMinutes = newRemainingMinutes
+                )
+
+                pendingEventDao.insert(
+                    PendingEventEntity(
+                        clientEventId = slotEventId,
+                        eventType = "SLOT_COMPLETED",
+                        payloadJson = slotPayloadJson,
+                        occurredAt = now,
+                        createdAt = now,
+                        retryCount = 0,
+                        lastError = null,
+                        synced = false
+                    )
+                )
+
+                if (taskCompleted && taskEventId != null && taskPayloadJson != null) {
+                    pendingEventDao.insert(
+                        PendingEventEntity(
+                            clientEventId = taskEventId,
+                            eventType = "TASK_COMPLETED",
+                            payloadJson = taskPayloadJson,
+                            occurredAt = now,
+                            createdAt = now,
+                            retryCount = 0,
+                            lastError = null,
+                            synced = false
+                        )
+                    )
+                }
+            }
+
+            Result.success(
+                SlotCompletionResult(
+                    durationMinutes = durationMinutes,
+                    taskRemainingMinutes = newRemainingMinutes,
+                    taskCompleted = taskCompleted
+                )
+            )
+        } catch (e: Throwable) {
+            Result.failure(e)
+        }
+    }
+
     private suspend fun generatePlanInternal(): PlanGenerationResult {
         studySlotDao.deleteByStatus("PROPOSED")
 
@@ -225,6 +341,12 @@ class StudyRepository(
         val scheduleItems = scheduleDao.getAllDownloadedOnce()
         val instances = classInstanceDao.getAllOnce()
         val originalTasks = taskDao.getActiveOnce()
+
+        val materialByPackage = materialDao.getAllDownloadedOnce()
+            .groupBy { it.packageExternalId }
+            .mapValues { entry ->
+                entry.value.minByOrNull { material -> material.title }
+            }
 
         val cancelledKeys = instances
             .filter { it.status == "CANCELLED" }
@@ -293,7 +415,7 @@ class StudyRepository(
                     val window = freeWindows[windowIndex]
                     val windowDuration = durationMinutes(window.start, window.end)
 
-                    var chunkMinutes = minOf(
+                    val chunkMinutes = minOf(
                         taskRemaining,
                         windowDuration,
                         dailyLoadLeft
@@ -327,7 +449,7 @@ class StudyRepository(
                         startDateTime = startMillis,
                         endDateTime = endMillis,
                         status = "PROPOSED",
-                        materialExternalId = null,
+                        materialExternalId = materialByPackage[task.packageExternalId]?.externalId,
                         createdAt = now
                     )
 

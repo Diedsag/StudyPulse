@@ -26,14 +26,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
 fun ReviewScreen(
-    materialExternalId: String?,
+    request: ReviewRequest,
     onExit: () -> Unit,
     viewModel: ReviewViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(materialExternalId) {
-        viewModel.start(materialExternalId)
+    LaunchedEffect(request) {
+        viewModel.start(request)
     }
 
     Column(

@@ -12,9 +12,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+data class ReviewRequest(
+    val packageExternalId: String? = null,
+    val materialExternalId: String? = null
+)
 
 data class ReviewUiState(
     val isLoading: Boolean = false,
@@ -38,7 +42,7 @@ class ReviewViewModel(
     private val _uiState = MutableStateFlow(ReviewUiState())
     val uiState: StateFlow<ReviewUiState> = _uiState.asStateFlow()
 
-    fun start(materialExternalId: String?) {
+    fun start(request: ReviewRequest) {
         viewModelScope.launch {
             _uiState.update { currentState ->
                 currentState.copy(
@@ -54,7 +58,10 @@ class ReviewViewModel(
                 )
             }
 
-            val result = repository.getDueCards(materialExternalId)
+            val result = repository.getDueCards(
+                packageExternalId = request.packageExternalId,
+                materialExternalId = request.materialExternalId
+            )
 
             _uiState.update { currentState ->
                 result.fold(

@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import com.studypulse.sync.ui.materials.MaterialsScreen
 import com.studypulse.sync.ui.packages.PackagesScreen
 import com.studypulse.sync.ui.plan.PlanScreen
+import com.studypulse.sync.ui.review.ReviewRequest
 import com.studypulse.sync.ui.review.ReviewScreen
 import com.studypulse.sync.ui.schedule.ScheduleScreen
 import com.studypulse.sync.ui.settings.SettingsScreen
@@ -47,16 +48,14 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun StudyPulseApp() {
     var selectedTab by rememberSaveable { mutableStateOf(0) }
-    var reviewMaterialId by remember { mutableStateOf<String?>(null) }
-
-    val activeReviewId = reviewMaterialId
+    var reviewRequest by remember { mutableStateOf<ReviewRequest?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = if (activeReviewId != null) {
+                        text = if (reviewRequest != null) {
                             "StudyPulse Review"
                         } else {
                             topBarTitle(selectedTab)
@@ -68,60 +67,60 @@ fun StudyPulseApp() {
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    selected = selectedTab == 0 && activeReviewId == null,
+                    selected = selectedTab == 0 && reviewRequest == null,
                     onClick = {
                         selectedTab = 0
-                        reviewMaterialId = null
+                        reviewRequest = null
                     },
                     icon = { Text("📦") },
                     label = { Text("Packages") }
                 )
 
                 NavigationBarItem(
-                    selected = selectedTab == 1 && activeReviewId == null,
+                    selected = selectedTab == 1 && reviewRequest == null,
                     onClick = {
                         selectedTab = 1
-                        reviewMaterialId = null
+                        reviewRequest = null
                     },
                     icon = { Text("📅") },
                     label = { Text("Schedule") }
                 )
 
                 NavigationBarItem(
-                    selected = selectedTab == 2 && activeReviewId == null,
+                    selected = selectedTab == 2 && reviewRequest == null,
                     onClick = {
                         selectedTab = 2
-                        reviewMaterialId = null
+                        reviewRequest = null
                     },
                     icon = { Text("📝") },
                     label = { Text("Tasks") }
                 )
 
                 NavigationBarItem(
-                    selected = selectedTab == 3 && activeReviewId == null,
+                    selected = selectedTab == 3 && reviewRequest == null,
                     onClick = {
                         selectedTab = 3
-                        reviewMaterialId = null
+                        reviewRequest = null
                     },
                     icon = { Text("🧠") },
                     label = { Text("Plan") }
                 )
 
                 NavigationBarItem(
-                    selected = selectedTab == 4 && activeReviewId == null,
+                    selected = selectedTab == 4 && reviewRequest == null,
                     onClick = {
                         selectedTab = 4
-                        reviewMaterialId = null
+                        reviewRequest = null
                     },
                     icon = { Text("📚") },
                     label = { Text("Materials") }
                 )
 
                 NavigationBarItem(
-                    selected = selectedTab == 5 && activeReviewId == null,
+                    selected = selectedTab == 5 && reviewRequest == null,
                     onClick = {
                         selectedTab = 5
-                        reviewMaterialId = null
+                        reviewRequest = null
                     },
                     icon = { Text("⚙️") },
                     label = { Text("Settings") }
@@ -134,27 +133,38 @@ fun StudyPulseApp() {
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
-            if (activeReviewId != null) {
+            val currentReview = reviewRequest
+
+            if (currentReview != null) {
                 ReviewScreen(
-                    materialExternalId = activeReviewId,
-                    onExit = { reviewMaterialId = null }
+                    request = currentReview,
+                    onExit = { reviewRequest = null }
                 )
             } else {
                 when (selectedTab) {
                     0 -> PackagesScreen()
+
                     1 -> ScheduleScreen()
+
                     2 -> TasksScreen(
                         onOpenPlanner = {
                             selectedTab = 3
-                            reviewMaterialId = null
+                            reviewRequest = null
                         }
                     )
-                    3 -> PlanScreen()
+
+                    3 -> PlanScreen(
+                        onStartReview = { request ->
+                            reviewRequest = request
+                        }
+                    )
+
                     4 -> MaterialsScreen(
-                        onStartReview = { materialId ->
-                            reviewMaterialId = materialId
+                        onStartReview = { request ->
+                            reviewRequest = request
                         }
                     )
+
                     else -> SettingsScreen()
                 }
             }

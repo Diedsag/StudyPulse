@@ -17,10 +17,11 @@ import com.studypulse.sync.data.local.entity.StudySlotEntity
 import com.studypulse.sync.data.local.entity.TaskEntity
 import kotlinx.coroutines.flow.Flow
 
-data class SlotWithTask(
+data class SlotWithTaskMaterial(
     @Embedded val slot: StudySlotEntity,
     val taskTitle: String,
-    val taskSubject: String?
+    val taskSubject: String?,
+    val materialTitle: String?
 )
 
 @Dao
@@ -117,6 +118,21 @@ interface MaterialDao {
     )
     fun observeDownloaded(): Flow<List<MaterialEntity>>
 
+    @Query(
+        "SELECT m.* FROM materials m " +
+            "INNER JOIN packages p ON m.packageExternalId = p.externalId " +
+            "WHERE p.isDownloaded = 1"
+    )
+    suspend fun getAllDownloadedOnce(): List<MaterialEntity>
+
+    @Query(
+        "SELECT * FROM materials " +
+            "WHERE packageExternalId = :packageExternalId " +
+            "ORDER BY title COLLATE NOCASE ASC " +
+            "LIMIT 1"
+    )
+    suspend fun getFirstByPackage(packageExternalId: String): MaterialEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<MaterialEntity>)
 
@@ -135,6 +151,17 @@ interface CardDao {
     )
     suspend fun getDueByMaterialOnce(
         materialExternalId: String,
+        now: Long
+    ): List<CardEntity>
+
+    @Query(
+        "SELECT * FROM cards " +
+            "WHERE packageExternalId = :packageExternalId " +
+                "AND dueAt <= :now " +
+            "ORDER BY position ASC"
+    )
+    suspend fun getDueByPackageOnce(
+        packageExternalId: String,
         now: Long
     ): List<CardEntity>
 
@@ -181,22 +208,14 @@ interface ClassInstanceDao {
 interface StudySlotDao {
 
     @Query(
-        "SELECT s.*, t.title AS taskTitle, t.subject AS taskSubject " +
+        "SELECT s.*, t.title AS taskTitle, t.subject AS taskSubject, m.title AS materialTitle " +
             "FROM study_slots s " +
             "INNER JOIN tasks t ON s.taskExternalId = t.externalId " +
+            "LEFT JOIN materials m ON s.materialExternalId = m.externalId " +
             "WHERE s.status = :status " +
             "ORDER BY s.startDateTime ASC"
     )
-    fun observeWithTask(status: String): Flow<List<SlotWithTask>>
-
-    @Query(
-        "SELECT s.*, t.title AS taskTitle, t.subject AS taskSubject " +
-            "FROM study_slots s " +
-            "INNER JOIN tasks t ON s.taskExternalId = t.externalId " +
-            "WHERE s.status = :status " +
-            "ORDER BY s.startDateTime ASC"
-    )
-    suspend fun getWithTaskOnce(status: String): List<SlotWithTask>
+    fun observeWithTaskMaterial(status: String): Flow<List<SlotWithTaskMaterial>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<StudySlotEntity>)
@@ -206,6 +225,9 @@ interface StudySlotDao {
 
     @Query("UPDATE study_slots SET status = :newStatus WHERE status = :oldStatus")
     suspend fun updateStatus(oldStatus: String, newStatus: String): Int
+
+    @Query("UPDATE study_slots SET status = :status WHERE id = :id")
+    suspend fun markStatus(id: Long, status: String): Int
 
     @Query("SELECT * FROM study_slots WHERE status = :status")
     suspend fun getAllByStatus(status: String): List<StudySlotEntity>

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.studypulse.sync.data.local.entity.MaterialEntity
+import com.studypulse.sync.ui.review.ReviewRequest
 import kotlinx.serialization.json.Json
 
 private val json = Json {
@@ -28,7 +29,7 @@ private val json = Json {
 
 @Composable
 fun MaterialsScreen(
-    onStartReview: (String?) -> Unit = {},
+    onStartReview: (ReviewRequest) -> Unit = {},
     viewModel: MaterialsViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -42,7 +43,7 @@ fun MaterialsScreen(
         Row(
             modifier = Modifier.fillMaxWidth()
         ) {
-            Button(onClick = { onStartReview(null) }) {
+            Button(onClick = { onStartReview(ReviewRequest()) }) {
                 Text("Повторить все due-карточки")
             }
         }
@@ -65,7 +66,11 @@ fun MaterialsScreen(
                 MaterialCard(
                     material = material,
                     onStartReview = {
-                        onStartReview(material.externalId)
+                        onStartReview(
+                            ReviewRequest(
+                                materialExternalId = material.externalId
+                            )
+                        )
                     }
                 )
             }
