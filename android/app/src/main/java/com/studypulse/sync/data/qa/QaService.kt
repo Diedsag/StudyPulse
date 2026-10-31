@@ -1,5 +1,4 @@
 package com.studypulse.sync.data.qa
-
 import com.studypulse.sync.data.local.AppDatabase
 import com.studypulse.sync.data.local.entity.MaterialChunkEntity
 import com.studypulse.sync.data.local.entity.MaterialEntity
@@ -22,7 +21,6 @@ data class QaAnswer(
 class QaService(
     private val database: AppDatabase
 ) {
-
     private val chunkDao = database.chunkDao()
     private val materialDao = database.materialDao()
 
@@ -32,19 +30,14 @@ class QaService(
             if (text.isBlank()) {
                 return Result.success(0)
             }
-
             chunkDao.deleteByMaterial(material.externalId)
-
             val chunkSize = 600
             val overlap = 100
             val chunks = mutableListOf<MaterialChunkEntity>()
-
-            val paragraphs = text.split("\n\n", "\n").map { it.trim() }.filter { it.isNotBlank() }
-
+            val paragraphs = text.split("\n", "\r\n").map { it.trim() }.filter { it.isNotBlank() }
             var currentChunk = StringBuilder()
             var orderIndex = 0
             val now = System.currentTimeMillis()
-
             for (paragraph in paragraphs) {
                 if (currentChunk.length + paragraph.length > chunkSize && currentChunk.isNotEmpty()) {
                     chunks += MaterialChunkEntity(
@@ -56,13 +49,11 @@ class QaService(
                         timecodeEndMs = null,
                         createdAt = now
                     )
-
                     val overlapText = currentChunk.takeLast(overlap)
                     currentChunk = StringBuilder(overlapText)
                 }
                 currentChunk.append(paragraph).append("\n")
             }
-
             if (currentChunk.isNotBlank()) {
                 chunks += MaterialChunkEntity(
                     materialExternalId = material.externalId,
@@ -74,7 +65,6 @@ class QaService(
                     createdAt = now
                 )
             }
-
             chunkDao.insertAll(chunks)
             Result.success(chunks.size)
         } catch (e: Throwable) {
@@ -92,16 +82,8 @@ class QaService(
             if (normalizedQuestion.isBlank()) {
                 return Result.failure(IllegalArgumentException("Вопрос не может быть пустым"))
             }
-
             val keywords = extractKeywords(normalizedQuestion)
-
-            val chunks = if (materialExternalId != null) {
-                chunkDao.searchByKeyword(materialExternalId, keywords.firstOrNull() ?: normalizedQuestion)
-            } else {
-                val allMaterials = materialDao.getAllActiveOnce()
-                chunkDao.searchByKeywordInMaterials(allMaterials.map { it.externalId }, keywords.firstOrNull() ?: normalizedQuestion)
-            }
-
+            val chunks = collectChunks(materialExternalId, keywords, normalizedQuestion)
             if (chunks.isEmpty()) {
                 return Result.success(
                     QaAnswer(
@@ -112,10 +94,8 @@ class QaService(
                     )
                 )
             }
-
             val topChunks = chunks.take(3)
             val materialMap = materialDao.getAllActiveOnce().associateBy { it.externalId }
-
             val citations = topChunks.map { chunk ->
                 val material = materialMap[chunk.materialExternalId]
                 Citation(
@@ -126,9 +106,7 @@ class QaService(
                     quotedText = chunk.text
                 )
             }
-
             val answerText = buildAnswer(topChunks, question)
-
             Result.success(
                 QaAnswer(
                     text = answerText,
@@ -142,9 +120,41 @@ class QaService(
         }
     }
 
+    private suspend fun collectChunks(
+        materialExternalId: String?,
+        keywords: List<String>,
+        normalizedQuestion: String
+    ): List<MaterialChunkEntity> {
+        val seen = HashSet<String>()
+        val result = ArrayList<MaterialChunkEntity>()
+        val terms = ArrayList<String>()
+        terms.addAll(keywords)
+        if (normalizedQuestion.isNotBlank() && normalizedQuestion !in terms) {
+            terms.add(normalizedQuestion)
+        }
+        val allMaterialIds: List<String>? = if (materialExternalId == null) {
+            materialDao.getAllActiveOnce().map { it.externalId }
+        } else null
+        for (term in terms) {
+            if (term.isBlank()) continue
+            val found = if (materialExternalId != null) {
+                chunkDao.searchByKeyword(materialExternalId, term)
+            } else {
+                chunkDao.searchByKeywordInMaterials(allMaterialIds ?: emptyList(), term)
+            }
+            for (c in found) {
+                val key = "${c.materialExternalId}#${c.orderIndex}"
+                if (seen.add(key)) {
+                    result.add(c)
+                }
+            }
+        }
+        return result
+    }
+
     fun answerGeneral(question: String): QaAnswer {
         return QaAnswer(
-            text = "Это общий ответ, не основанный на ваших материалах.\n\n" +
+            text = "Это общий ответ, не основанный на ваших материалах.\n" +
                 "Для точного ответа добавьте материалы и задайте вопрос по ним.",
             citations = emptyList(),
             isGeneral = true,
@@ -158,38 +168,32 @@ class QaService(
             "это", "есть", "быть", "был", "была", "были", "будет",
             "и", "или", "но", "а", "в", "на", "по", "с", "со", "к", "ко", "о", "об", "обо",
             "из", "от", "до", "за", "перед", "над", "под", "про", "через",
-            "для", "при", "после", "до", "между", "среди"
+            "для", "при", "после", "между", "среди"
         )
-
         val words = text.split(Regex("\\s+"))
             .map { it.lowercase().replace(Regex("[^а-яa-z0-9]"), "") }
-            .filter { it.length > 2 && it !in stopWords }
+            .filter { it.length > 1 && it !in stopWords }
             .distinct()
-
-        return words.take(3)
+        return words.take(5)
     }
 
     private fun buildAnswer(chunks: List<MaterialChunkEntity>, question: String): String {
         val sb = StringBuilder()
-        sb.append("По вашим материалам:\n\n")
-
+        sb.append("По вашим материалам:\n")
         chunks.forEachIndexed { index, chunk ->
             sb.append(chunk.text.trim())
             if (index < chunks.lastIndex) {
-                sb.append("\n\n---\n\n")
+                sb.append("\n---\n")
             }
         }
-
         return sb.toString()
     }
 
     private fun formatTimecode(timecodeMs: Long?): String? {
         if (timecodeMs == null) return null
-
         val totalSeconds = timecodeMs / 1000
         val minutes = totalSeconds / 60
         val seconds = totalSeconds % 60
-
         return "%d:%02d".format(minutes, seconds)
     }
 }
