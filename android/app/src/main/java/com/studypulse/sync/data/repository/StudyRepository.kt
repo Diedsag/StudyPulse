@@ -1,12 +1,18 @@
 package com.studypulse.sync.data.repository
 
+import androidx.room.withTransaction
 import com.studypulse.sync.data.local.AppDatabase
+import com.studypulse.sync.data.local.dao.SlotWithTask
 import com.studypulse.sync.data.local.entity.ClassInstanceEntity
 import com.studypulse.sync.data.local.entity.ScheduleItemEntity
+import com.studypulse.sync.data.local.entity.StudySlotEntity
 import com.studypulse.sync.data.local.entity.TaskEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 data class ClassOccurrence(
@@ -28,6 +34,11 @@ data class ClassOccurrence(
     val isCancelled: Boolean
 )
 
+data class PlanGenerationResult(
+    val slotsCount: Int,
+    val warnings: List<String>
+)
+
 class StudyRepository(
     private val database: AppDatabase
 ) {
@@ -35,9 +46,16 @@ class StudyRepository(
     private val scheduleDao = database.scheduleDao()
     private val taskDao = database.taskDao()
     private val classInstanceDao = database.classInstanceDao()
+    private val studySlotDao = database.studySlotDao()
 
     val tasks: Flow<List<TaskEntity>> =
         taskDao.observeDownloaded()
+
+    val proposedSlots: Flow<List<SlotWithTask>> =
+        studySlotDao.observeWithTask("PROPOSED")
+
+    val plannedSlots: Flow<List<SlotWithTask>> =
+        studySlotDao.observeWithTask("PLANNED")
 
     fun upcomingOccurrences(daysAhead: Int = 7): Flow<List<ClassOccurrence>> {
         return combine(
@@ -63,6 +81,201 @@ class StudyRepository(
                 status = "CANCELLED",
                 updatedAt = System.currentTimeMillis()
             )
+        )
+    }
+
+    suspend fun generatePlan(): Result<PlanGenerationResult> {
+        return try {
+            val result = database.withTransaction {
+                generatePlanInternal()
+            }
+
+            Result.success(result)
+        } catch (e: Throwable) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun acceptPlan(): Result<Int> {
+        return try {
+            val count = database.withTransaction {
+                studySlotDao.updateStatus(
+                    oldStatus = "PROPOSED",
+                    newStatus = "PLANNED"
+                )
+            }
+
+            Result.success(count)
+        } catch (e: Throwable) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun generatePlanInternal(): PlanGenerationResult {
+        studySlotDao.deleteByStatus("PROPOSED")
+
+        val now = System.currentTimeMillis()
+        val today = LocalDate.now()
+
+        val dayStart = LocalTime.of(8, 0)
+        val dayEnd = LocalTime.of(22, 0)
+
+        val minSlotMinutes = 30
+        val maxDailyLoadMinutes = 180
+        val horizonDays = 3
+
+        val scheduleItems = scheduleDao.getAllDownloadedOnce()
+        val instances = classInstanceDao.getAllOnce()
+        val originalTasks = taskDao.getActiveOnce()
+
+        val cancelledKeys = instances
+            .filter { it.status == "CANCELLED" }
+            .map { it.templateExternalId to it.date }
+            .toSet()
+
+        val remainingByTaskId = originalTasks
+            .associate { it.externalId to it.remainingMinutes }
+            .toMutableMap()
+
+        val proposedSlots = mutableListOf<StudySlotEntity>()
+
+        for (offset in 0 until horizonDays) {
+            val date = today.plusDays(offset.toLong())
+            val isoDate = date.toString()
+            val dayOfWeek = date.dayOfWeek.value
+
+            val occupiedIntervals = scheduleItems
+                .filter { item ->
+                    item.dayOfWeek == dayOfWeek &&
+                        (item.externalId to isoDate) !in cancelledKeys
+                }
+                .mapNotNull { item ->
+                    val start = parseTimeOrNull(item.startTime) ?: return@mapNotNull null
+                    val end = parseTimeOrNull(item.endTime) ?: return@mapNotNull null
+
+                    val clippedStart = maxOf(start, dayStart)
+                    val clippedEnd = minOf(end, dayEnd)
+
+                    if (clippedStart < clippedEnd) {
+                        TimeInterval(clippedStart, clippedEnd)
+                    } else {
+                        null
+                    }
+                }
+                .sortedBy { it.start }
+
+            val mergedOccupied = mergeIntervals(occupiedIntervals)
+            val freeWindows = buildFreeWindows(
+                dayStart = dayStart,
+                dayEnd = dayEnd,
+                occupied = mergedOccupied
+            ).toMutableList()
+
+            var dailyLoadLeft = maxDailyLoadMinutes
+
+            for (task in originalTasks) {
+                var taskRemaining = remainingByTaskId[task.externalId] ?: 0
+
+                if (taskRemaining <= 0) continue
+
+                while (
+                    taskRemaining > 0 &&
+                    dailyLoadLeft > 0 &&
+                    freeWindows.isNotEmpty()
+                ) {
+                    val windowIndex = freeWindows.indexOfFirst { window ->
+                        val windowDuration = durationMinutes(window.start, window.end)
+
+                        windowDuration >= minSlotMinutes ||
+                            (taskRemaining < minSlotMinutes && windowDuration >= taskRemaining)
+                    }
+
+                    if (windowIndex < 0) break
+
+                    val window = freeWindows[windowIndex]
+                    val windowDuration = durationMinutes(window.start, window.end)
+
+                    var chunkMinutes = minOf(
+                        taskRemaining,
+                        windowDuration,
+                        dailyLoadLeft
+                    )
+
+                    if (chunkMinutes <= 0) {
+                        freeWindows.removeAt(windowIndex)
+                        continue
+                    }
+
+                    if (chunkMinutes < minSlotMinutes && taskRemaining >= minSlotMinutes) {
+                        if (dailyLoadLeft < minSlotMinutes) break
+
+                        if (windowDuration < minSlotMinutes) {
+                            freeWindows.removeAt(windowIndex)
+                            continue
+                        }
+
+                        break
+                    }
+
+                    val startMillis = toEpochMillis(date, window.start)
+                    val endMillis = toEpochMillis(
+                        date,
+                        window.start.plusMinutes(chunkMinutes.toLong())
+                    )
+
+                    proposedSlots += StudySlotEntity(
+                        taskExternalId = task.externalId,
+                        packageExternalId = task.packageExternalId,
+                        startDateTime = startMillis,
+                        endDateTime = endMillis,
+                        status = "PROPOSED",
+                        materialExternalId = null,
+                        createdAt = now
+                    )
+
+                    taskRemaining -= chunkMinutes
+                    dailyLoadLeft -= chunkMinutes
+                    remainingByTaskId[task.externalId] = taskRemaining
+
+                    val newWindowStart = window.start.plusMinutes(chunkMinutes.toLong())
+
+                    if (newWindowStart >= window.end) {
+                        freeWindows.removeAt(windowIndex)
+                    } else {
+                        freeWindows[windowIndex] = FreeWindow(newWindowStart, window.end)
+                    }
+                }
+
+                remainingByTaskId[task.externalId] = taskRemaining
+            }
+        }
+
+        studySlotDao.insertAll(proposedSlots)
+
+        val warnings = mutableListOf<String>()
+
+        if (originalTasks.isEmpty()) {
+            warnings += "Нет активных заданий для планирования."
+        } else {
+            for (task in originalTasks) {
+                val allocatedMinutes = proposedSlots
+                    .filter { it.taskExternalId == task.externalId }
+                    .sumOf { slot ->
+                        ((slot.endDateTime - slot.startDateTime) / 60_000L).toInt().toLong()
+                    }
+                    .toInt()
+
+                val shortage = task.remainingMinutes - allocatedMinutes
+
+                if (shortage > 0) {
+                    warnings += "Не хватает ${shortage} мин для: ${task.title}"
+                }
+            }
+        }
+
+        return PlanGenerationResult(
+            slotsCount = proposedSlots.size,
+            warnings = warnings
         )
     }
 
@@ -119,6 +332,83 @@ class StudyRepository(
             compareBy({ it.date }, { it.startTime })
         )
     }
+
+    private fun mergeIntervals(input: List<TimeInterval>): List<TimeInterval> {
+        if (input.isEmpty()) return emptyList()
+
+        val sorted = input.sortedBy { it.start }
+        val merged = mutableListOf(sorted.first())
+
+        for (next in sorted.drop(1)) {
+            val last = merged.last()
+
+            if (next.start <= last.end) {
+                merged[merged.lastIndex] = TimeInterval(
+                    start = last.start,
+                    end = maxOf(last.end, next.end)
+                )
+            } else {
+                merged += next
+            }
+        }
+
+        return merged
+    }
+
+    private fun buildFreeWindows(
+        dayStart: LocalTime,
+        dayEnd: LocalTime,
+        occupied: List<TimeInterval>
+    ): List<FreeWindow> {
+        val windows = mutableListOf<FreeWindow>()
+        var cursor = dayStart
+
+        for (interval in occupied) {
+            if (cursor < interval.start) {
+                windows += FreeWindow(cursor, interval.start)
+            }
+
+            if (interval.end > cursor) {
+                cursor = interval.end
+            }
+        }
+
+        if (cursor < dayEnd) {
+            windows += FreeWindow(cursor, dayEnd)
+        }
+
+        return windows.filter { durationMinutes(it.start, it.end) > 0 }
+    }
+
+    private fun parseTimeOrNull(value: String): LocalTime? {
+        return try {
+            LocalTime.parse(value)
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun durationMinutes(start: LocalTime, end: LocalTime): Int {
+        return Duration.between(start, end).toMinutes().toInt()
+    }
+
+    private fun toEpochMillis(date: LocalDate, time: LocalTime): Long {
+        return date
+            .atTime(time)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+    }
+
+    private data class TimeInterval(
+        val start: LocalTime,
+        val end: LocalTime
+    )
+
+    private data class FreeWindow(
+        val start: LocalTime,
+        val end: LocalTime
+    )
 
     private val weekdayNames = mapOf(
         1 to "Понедельник",

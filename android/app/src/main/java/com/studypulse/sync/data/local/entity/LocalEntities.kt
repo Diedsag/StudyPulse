@@ -131,3 +131,27 @@ data class ClassInstanceEntity(
 
     val updatedAt: Long
 )
+
+@Entity(
+    tableName = "study_slots",
+    indices = [
+        Index("taskExternalId"),
+        Index("status"),
+        Index("startDateTime")
+    ]
+)
+data class StudySlotEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
+    val taskExternalId: String,
+    val packageExternalId: String,
+
+    val startDateTime: Long,
+    val endDateTime: Long,
+
+    val status: String,
+
+    val materialExternalId: String? = null,
+    val createdAt: Long
+)

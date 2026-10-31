@@ -20,6 +20,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.studypulse.sync.ui.packages.PackagesScreen
+import com.studypulse.sync.ui.plan.PlanScreen
 import com.studypulse.sync.ui.schedule.ScheduleScreen
 import com.studypulse.sync.ui.settings.SettingsScreen
 import com.studypulse.sync.ui.tasks.TasksScreen
@@ -78,6 +79,13 @@ fun StudyPulseApp() {
                 NavigationBarItem(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 },
+                    icon = { Text("🧠") },
+                    label = { Text("Plan") }
+                )
+
+                NavigationBarItem(
+                    selected = selectedTab == 4,
+                    onClick = { selectedTab = 4 },
                     icon = { Text("⚙️") },
                     label = { Text("Settings") }
                 )
@@ -92,7 +100,10 @@ fun StudyPulseApp() {
             when (selectedTab) {
                 0 -> PackagesScreen()
                 1 -> ScheduleScreen()
-                2 -> TasksScreen()
+                2 -> TasksScreen(
+                    onOpenPlanner = { selectedTab = 3 }
+                )
+                3 -> PlanScreen()
                 else -> SettingsScreen()
             }
         }
@@ -104,6 +115,7 @@ private fun topBarTitle(tab: Int): String {
         0 -> "StudyPulse Packages"
         1 -> "StudyPulse Schedule"
         2 -> "StudyPulse Tasks"
+        3 -> "StudyPulse Plan"
         else -> "StudyPulse Settings"
     }
 }

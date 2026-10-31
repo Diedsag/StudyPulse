@@ -9,12 +9,14 @@ import com.studypulse.sync.data.local.dao.ClassInstanceDao
 import com.studypulse.sync.data.local.dao.MaterialDao
 import com.studypulse.sync.data.local.dao.PackageDao
 import com.studypulse.sync.data.local.dao.ScheduleDao
+import com.studypulse.sync.data.local.dao.StudySlotDao
 import com.studypulse.sync.data.local.dao.TaskDao
 import com.studypulse.sync.data.local.entity.CardEntity
 import com.studypulse.sync.data.local.entity.ClassInstanceEntity
 import com.studypulse.sync.data.local.entity.MaterialEntity
 import com.studypulse.sync.data.local.entity.ScheduleItemEntity
 import com.studypulse.sync.data.local.entity.StudyPackageEntity
+import com.studypulse.sync.data.local.entity.StudySlotEntity
 import com.studypulse.sync.data.local.entity.TaskEntity
 
 @Database(
@@ -24,9 +26,10 @@ import com.studypulse.sync.data.local.entity.TaskEntity
         TaskEntity::class,
         MaterialEntity::class,
         CardEntity::class,
-        ClassInstanceEntity::class
+        ClassInstanceEntity::class,
+        StudySlotEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -37,6 +40,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun materialDao(): MaterialDao
     abstract fun cardDao(): CardDao
     abstract fun classInstanceDao(): ClassInstanceDao
+    abstract fun studySlotDao(): StudySlotDao
 
     companion object {
 

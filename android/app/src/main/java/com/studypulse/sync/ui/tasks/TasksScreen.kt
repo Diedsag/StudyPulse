@@ -2,11 +2,13 @@ package com.studypulse.sync.ui.tasks
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,6 +24,7 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun TasksScreen(
+    onOpenPlanner: () -> Unit = {},
     viewModel: TasksViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -32,6 +35,15 @@ fun TasksScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(onClick = onOpenPlanner) {
+                Text("Спланировать")
+            }
+        }
+
         if (state.tasks.isEmpty()) {
             Text(
                 text = "Нет заданий. Скачай учебный пакет во вкладке Packages.",
