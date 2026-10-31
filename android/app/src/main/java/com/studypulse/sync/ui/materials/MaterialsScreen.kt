@@ -31,7 +31,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.mergeDescendants
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selectableGroup
 import androidx.compose.ui.semantics.selected
@@ -73,7 +72,7 @@ fun MaterialsScreen(
             }
         }
 
-        // 1.4: сообщение экрана озвучивается TalkBack как polite live-region.
+        // 1.4: сообщение экрана — polite live-region (озвучивается без сброса фокуса).
         state.message?.let {
             Text(
                 text = it,
@@ -115,7 +114,7 @@ fun MaterialsScreen(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MaterialForm(state: MaterialsUiState, viewModel: MaterialsViewModel) {
-    // 1.5: фокус на поле названия при открытии формы, с защитой от гонки attach.
+    // 1.5: фокус на поле названия при открытии формы, с защитой от гонки attach/detach.
     val titleFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { titleFocus.requestFocus() } }
 
@@ -147,10 +146,10 @@ private fun MaterialForm(state: MaterialsUiState, viewModel: MaterialsViewModel)
 
             if (state.subjects.isNotEmpty()) {
                 Text(text = "Предметы", style = MaterialTheme.typography.labelLarge)
-                // 1.2: группа выбора без смены компонента на FilterChip.
+                // 1.2: группа выбора поверх существующих Button/OutlinedButton (без FilterChip).
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.selectableGroup()
+                    modifier = Modifier.semantics { selectableGroup() }
                 ) {
                     val noneSelected = state.selectedSubjectId == null
                     if (noneSelected) {
@@ -229,15 +228,15 @@ private fun MaterialCard(
         // Внешний Column НЕ mergeDescendants: иначе кнопки слились бы в один фокус.
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
 
-            // 1.3: описательный под-блок объединяется в один узел доступности.
-            Column(modifier = Modifier.mergeDescendants()) {
+            // 1.3: описательный под-блок — один узел доступности (mergeDescendants как ПАРАМЕТР semantics).
+            Column(modifier = Modifier.semantics(mergeDescendants = true)) {
                 // 3.2: заголовок материала помечен как heading.
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.heading()
+                    modifier = Modifier.semantics { heading() }
                 )
                 material.sourceLabel?.let { source ->
                     Text(text = "Источник: $source", style = MaterialTheme.typography.bodySmall)
@@ -258,8 +257,7 @@ private fun MaterialCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 1.1: contentDescription содержит и глагол, и контекст материала,
-            // поэтому TalkBack не теряет смысл действия.
+            // 1.1: contentDescription = глагол + контекст материала (TalkBack не теряет смысл действия).
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = onStartReview,
