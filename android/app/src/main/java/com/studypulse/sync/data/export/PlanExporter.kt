@@ -1,5 +1,6 @@
 package com.studypulse.sync.data.export
 
+import android.annotation.SuppressLint
 import com.studypulse.sync.data.local.AppDatabase
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
@@ -7,6 +8,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.Instant
 
+@SuppressLint("UnsafeOptInUsageError")
 @Serializable
 data class ExportSubject(
     val id: Long,
@@ -16,6 +18,7 @@ data class ExportSubject(
     val source: String
 )
 
+@SuppressLint("UnsafeOptInUsageError")
 @Serializable
 data class ExportScheduleItem(
     val externalId: String,
@@ -30,6 +33,7 @@ data class ExportScheduleItem(
     val source: String
 )
 
+@SuppressLint("UnsafeOptInUsageError")
 @Serializable
 data class ExportTask(
     val externalId: String,
@@ -43,6 +47,7 @@ data class ExportTask(
     val source: String
 )
 
+@SuppressLint("UnsafeOptInUsageError")
 @Serializable
 data class ExportMaterial(
     val externalId: String,
@@ -52,6 +57,7 @@ data class ExportMaterial(
     val source: String
 )
 
+@SuppressLint("UnsafeOptInUsageError")
 @Serializable
 data class ExportData(
     val version: Int = 1,
@@ -73,13 +79,11 @@ class PlanExporter(
 
     suspend fun exportPlan(): Result<String> {
         return try {
-            // 1. Получаем списки напрямую (first() возвращает List<T> из Flow<List<T>>)
             val subjectsList = database.subjectDao().observeAll().first()
             val scheduleTemplatesList = database.scheduleDao().getAllActiveOnce()
             val tasksList = database.taskDao().getActiveOnce()
             val materialsList = database.materialDao().getAllActiveOnce()
 
-            // 2. Маппим Entity в DTO для безопасной сериализации
             val subjects = subjectsList.map { s ->
                 ExportSubject(
                     id = s.id,
@@ -129,7 +133,6 @@ class PlanExporter(
                 )
             }
 
-            // 3. Собираем итоговый объект
             val exportData = ExportData(
                 exportedAt = Instant.now().toString(),
                 subjects = subjects,
@@ -138,8 +141,8 @@ class PlanExporter(
                 materials = materials
             )
 
-            // 4. Сериализуем в JSON
-            val jsonString = json.encodeToString(exportData)
+            // ИСПРАВЛЕНИЕ: Явное указание сериализатора устраняет необходимость в @OptIn
+            val jsonString = json.encodeToString(ExportData.serializer(), exportData)
             Result.success(jsonString)
         } catch (e: Exception) {
             Result.failure(e)
