@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.studypulse.sync.data.local.entity.MaterialEntity
+import com.studypulse.sync.data.local.entity.SubjectEntity
 import com.studypulse.sync.ui.review.ReviewRequest
 import kotlinx.serialization.json.Json
 
@@ -45,10 +47,100 @@ fun MaterialsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(onClick = { onStartReview(ReviewRequest()) }) {
+            Button(onClick = viewModel::startAdd) {
+                Text("Добавить материал")
+            }
+
+            OutlinedButton(onClick = { onStartReview(ReviewRequest()) }) {
                 Text("Повторить все due-карточки")
+            }
+        }
+
+        state.message?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+
+        if (state.isFormOpen) {
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = if (state.editingExternalId == null) "Новый материал" else "Редактирование материала",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    if (state.subjects.isNotEmpty()) {
+                        Text(
+                            text = "Предметы",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.selectSubject(null) }
+                            ) {
+                                Text("Без предмета")
+                            }
+
+                            state.subjects.forEach { subject ->
+                                OutlinedButton(
+                                    onClick = { viewModel.selectSubject(subject) }
+                                ) {
+                                    Text(subject.name)
+                                }
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = state.title,
+                        onValueChange = viewModel::onTitleChange,
+                        label = { Text("Название") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = state.sourceLabel,
+                        onValueChange = viewModel::onSourceLabelChange,
+                        label = { Text("Источник") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = state.text,
+                        onValueChange = viewModel::onTextChange,
+                        label = { Text("Текст материала") },
+                        minLines = 6,
+                        maxLines = 12,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(onClick = viewModel::save) {
+                            Text("Сохранить")
+                        }
+
+                        OutlinedButton(onClick = viewModel::toggleForm) {
+                            Text("Скрыть форму")
+                        }
+                    }
+                }
             }
         }
 
@@ -66,7 +158,7 @@ fun MaterialsScreen(
                     )
 
                     Text(
-                        text = "Скачай учебный пакет во вкладке «Пакеты», чтобы здесь появились материалы и карточки.",
+                        text = "Добавь материал вручную или скачай учебный пакет.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -92,7 +184,9 @@ fun MaterialsScreen(
                     },
                     onAsk = {
                         onAsk(material.externalId)
-                    }
+                    },
+                    onEdit = { viewModel.startEdit(material) },
+                    onDelete = { viewModel.delete(material) }
                 )
             }
         }
@@ -103,7 +197,9 @@ fun MaterialsScreen(
 private fun MaterialCard(
     material: MaterialEntity,
     onStartReview: () -> Unit,
-    onAsk: () -> Unit
+    onAsk: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     val keyFacts = parseKeyFacts(material.keyFactsJson)
 
@@ -127,6 +223,11 @@ private fun MaterialCard(
                     style = MaterialTheme.typography.bodySmall
                 )
             }
+
+            Text(
+                text = "Источник данных: ${sourceLabel(material.source)}",
+                style = MaterialTheme.typography.bodySmall
+            )
 
             Text(
                 text = material.summaryText,
@@ -171,6 +272,20 @@ private fun MaterialCard(
                 ) {
                     Text("Спросить по материалу")
                 }
+
+                if (material.source == "LOCAL") {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(onClick = onEdit) {
+                            Text("Редактировать")
+                        }
+
+                        OutlinedButton(onClick = onDelete) {
+                            Text("Удалить")
+                        }
+                    }
+                }
             }
         }
     }
@@ -183,5 +298,13 @@ private fun parseKeyFacts(raw: String?): List<String> {
         json.decodeFromString<List<String>>(raw)
     } catch (_: Throwable) {
         emptyList()
+    }
+}
+
+private fun sourceLabel(source: String): String {
+    return when (source) {
+        "LOCAL" -> "локальный"
+        "PACKAGE" -> "из пакета"
+        else -> source
     }
 }

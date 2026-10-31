@@ -26,14 +26,37 @@ data class StudyPackageEntity(
 )
 
 @Entity(
+    tableName = "subjects",
+    indices = [Index("name")]
+)
+data class SubjectEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
+    val name: String,
+    val colorArgb: Int,
+    val teacher: String? = null,
+
+    val source: String = "LOCAL",
+    val packageExternalId: String? = null,
+
+    val createdAt: Long,
+    val updatedAt: Long
+)
+
+@Entity(
     tableName = "schedule_items",
-    indices = [Index("packageExternalId"), Index("dayOfWeek")]
+    indices = [
+        Index("packageExternalId"),
+        Index("dayOfWeek"),
+        Index("source")
+    ]
 )
 data class ScheduleItemEntity(
     @PrimaryKey
     val externalId: String,
 
-    val packageExternalId: String,
+    val packageExternalId: String? = null,
 
     val subject: String,
     val lessonType: String?,
@@ -44,7 +67,10 @@ data class ScheduleItemEntity(
 
     val room: String?,
     val teacher: String?,
-    val parity: String?
+    val parity: String?,
+
+    val subjectId: Long? = null,
+    val source: String = "PACKAGE"
 )
 
 @Entity(
@@ -52,14 +78,15 @@ data class ScheduleItemEntity(
     indices = [
         Index("packageExternalId"),
         Index("deadlineDate"),
-        Index("status")
+        Index("status"),
+        Index("source")
     ]
 )
 data class TaskEntity(
     @PrimaryKey
     val externalId: String,
 
-    val packageExternalId: String,
+    val packageExternalId: String? = null,
 
     val title: String,
     val subject: String?,
@@ -69,24 +96,41 @@ data class TaskEntity(
     val priority: Int,
 
     val status: String,
-    val remainingMinutes: Int
+    val remainingMinutes: Int,
+
+    val subjectId: Long? = null,
+    val source: String = "PACKAGE",
+    val description: String? = null,
+
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L
 )
 
 @Entity(
     tableName = "materials",
-    indices = [Index("packageExternalId")]
+    indices = [
+        Index("packageExternalId"),
+        Index("source")
+    ]
 )
 data class MaterialEntity(
     @PrimaryKey
     val externalId: String,
 
-    val packageExternalId: String,
+    val packageExternalId: String? = null,
 
     val title: String,
     val sourceLabel: String?,
 
     val summaryText: String,
-    val keyFactsJson: String?
+    val keyFactsJson: String?,
+
+    val subjectId: Long? = null,
+    val source: String = "PACKAGE",
+    val rawText: String? = null,
+
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L
 )
 
 @Entity(

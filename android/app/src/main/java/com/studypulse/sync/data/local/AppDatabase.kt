@@ -14,6 +14,7 @@ import com.studypulse.sync.data.local.dao.ReviewLogDao
 import com.studypulse.sync.data.local.dao.ScheduleDao
 import com.studypulse.sync.data.local.dao.StatsSnapshotDao
 import com.studypulse.sync.data.local.dao.StudySlotDao
+import com.studypulse.sync.data.local.dao.SubjectDao
 import com.studypulse.sync.data.local.dao.TaskDao
 import com.studypulse.sync.data.local.entity.CardEntity
 import com.studypulse.sync.data.local.entity.ClassInstanceEntity
@@ -24,11 +25,13 @@ import com.studypulse.sync.data.local.entity.ScheduleItemEntity
 import com.studypulse.sync.data.local.entity.StatsSnapshotEntity
 import com.studypulse.sync.data.local.entity.StudyPackageEntity
 import com.studypulse.sync.data.local.entity.StudySlotEntity
+import com.studypulse.sync.data.local.entity.SubjectEntity
 import com.studypulse.sync.data.local.entity.TaskEntity
 
 @Database(
     entities = [
         StudyPackageEntity::class,
+        SubjectEntity::class,
         ScheduleItemEntity::class,
         TaskEntity::class,
         MaterialEntity::class,
@@ -39,12 +42,13 @@ import com.studypulse.sync.data.local.entity.TaskEntity
         PendingEventEntity::class,
         StatsSnapshotEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun packageDao(): PackageDao
+    abstract fun subjectDao(): SubjectDao
     abstract fun scheduleDao(): ScheduleDao
     abstract fun taskDao(): TaskDao
     abstract fun materialDao(): MaterialDao

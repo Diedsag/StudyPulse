@@ -33,6 +33,7 @@ import com.studypulse.sync.ui.review.ReviewScreen
 import com.studypulse.sync.ui.schedule.ScheduleScreen
 import com.studypulse.sync.ui.settings.SettingsScreen
 import com.studypulse.sync.ui.stats.StatsScreen
+import com.studypulse.sync.ui.subjects.SubjectScreen
 import com.studypulse.sync.ui.tasks.TasksScreen
 import com.studypulse.sync.ui.theme.StudyPulseTheme
 
@@ -60,6 +61,7 @@ fun StudyPulseApp() {
 
     val tabs = listOf(
         "Пакеты",
+        "Предметы",
         "Расписание",
         "Задания",
         "План",
@@ -135,18 +137,20 @@ fun StudyPulseApp() {
                     when (selectedTab) {
                         0 -> PackagesScreen()
 
-                        1 -> ScheduleScreen()
+                        1 -> SubjectScreen()
 
-                        2 -> TasksScreen(
+                        2 -> ScheduleScreen()
+
+                        3 -> TasksScreen(
                             onOpenPlanner = {
-                                selectedTab = 3
+                                selectedTab = 4
                                 reviewRequest = null
                                 focusSlotId = null
                                 qaMaterialId = null
                             }
                         )
 
-                        3 -> PlanScreen(
+                        4 -> PlanScreen(
                             onStartReview = { request ->
                                 reviewRequest = request
                             },
@@ -155,7 +159,7 @@ fun StudyPulseApp() {
                             }
                         )
 
-                        4 -> MaterialsScreen(
+                        5 -> MaterialsScreen(
                             onStartReview = { request ->
                                 reviewRequest = request
                             },
@@ -164,7 +168,7 @@ fun StudyPulseApp() {
                             }
                         )
 
-                        5 -> StatsScreen()
+                        6 -> StatsScreen()
 
                         else -> SettingsScreen()
                     }

@@ -26,11 +26,12 @@ import java.util.UUID
 
 data class ClassOccurrence(
     val templateExternalId: String,
-    val packageExternalId: String,
+    val packageExternalId: String?,
 
     val date: String,
     val displayDate: String,
     val weekday: String,
+    val dayOfWeek: Int,
 
     val startTime: String,
     val endTime: String,
@@ -39,6 +40,10 @@ data class ClassOccurrence(
     val lessonType: String?,
     val room: String?,
     val teacher: String?,
+    val parity: String?,
+
+    val subjectId: Long?,
+    val source: String,
 
     val isCancelled: Boolean
 )
@@ -73,10 +78,10 @@ class StudyRepository(
     private val pendingEventDao = database.pendingEventDao()
 
     val tasks: Flow<List<TaskEntity>> =
-        taskDao.observeDownloaded()
+        taskDao.observeActive()
 
     val materials: Flow<List<MaterialEntity>> =
-        materialDao.observeDownloaded()
+        materialDao.observeActive()
 
     val proposedSlots: Flow<List<SlotWithTaskMaterial>> =
         studySlotDao.observeWithTaskMaterial("PROPOSED")
@@ -86,7 +91,7 @@ class StudyRepository(
 
     fun upcomingOccurrences(daysAhead: Int = 7): Flow<List<ClassOccurrence>> {
         return combine(
-            scheduleDao.observeDownloaded(),
+            scheduleDao.observeActive(),
             classInstanceDao.observeAll()
         ) { scheduleItems, instances ->
             buildOccurrences(
@@ -391,12 +396,21 @@ class StudyRepository(
         val maxDailyLoadMinutes = 180
         val horizonDays = 3
 
-        val scheduleItems = scheduleDao.getAllDownloadedOnce()
+        val scheduleItems = scheduleDao.getAllActiveOnce()
         val instances = classInstanceDao.getAllOnce()
         val originalTasks = taskDao.getActiveOnce()
+        val allMaterials = materialDao.getAllActiveOnce()
 
-        val materialByPackage = materialDao.getAllDownloadedOnce()
-            .groupBy { it.packageExternalId }
+        val materialByPackage = allMaterials
+            .filter { !it.packageExternalId.isNullOrBlank() }
+            .groupBy { it.packageExternalId!! }
+            .mapValues { entry ->
+                entry.value.minByOrNull { material -> material.title }
+            }
+
+        val materialBySubject = allMaterials
+            .filter { it.subjectId != null }
+            .groupBy { it.subjectId!! }
             .mapValues { entry ->
                 entry.value.minByOrNull { material -> material.title }
             }
@@ -496,13 +510,19 @@ class StudyRepository(
                         window.start.plusMinutes(chunkMinutes.toLong())
                     )
 
+                    val linkedMaterial = if (!task.packageExternalId.isNullOrBlank()) {
+                        materialByPackage[task.packageExternalId]
+                    } else {
+                        task.subjectId?.let { materialBySubject[it] }
+                    }
+
                     proposedSlots += StudySlotEntity(
                         taskExternalId = task.externalId,
-                        packageExternalId = task.packageExternalId,
+                        packageExternalId = task.packageExternalId.orEmpty(),
                         startDateTime = startMillis,
                         endDateTime = endMillis,
                         status = "PROPOSED",
-                        materialExternalId = materialByPackage[task.packageExternalId]?.externalId,
+                        materialExternalId = linkedMaterial?.externalId,
                         createdAt = now
                     )
 
@@ -589,12 +609,16 @@ class StudyRepository(
                     date = isoDate,
                     displayDate = displayDate,
                     weekday = weekday,
+                    dayOfWeek = item.dayOfWeek,
                     startTime = item.startTime,
                     endTime = item.endTime,
                     subject = item.subject,
                     lessonType = item.lessonType,
                     room = item.room,
                     teacher = item.teacher,
+                    parity = item.parity,
+                    subjectId = item.subjectId,
+                    source = item.source,
                     isCancelled = isCancelled
                 )
             }
