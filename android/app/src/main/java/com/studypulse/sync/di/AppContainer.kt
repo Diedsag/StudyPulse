@@ -7,6 +7,8 @@ import com.studypulse.sync.core.network.ApiClient
 import com.studypulse.sync.core.network.ApiService
 import com.studypulse.sync.data.export.PlanExporter
 import com.studypulse.sync.data.local.AppDatabase
+import com.studypulse.sync.data.profile.ProfileRepository
+import com.studypulse.sync.data.profile.profileDataStore
 import com.studypulse.sync.data.qa.QaService
 import com.studypulse.sync.data.repository.AssistantRepository
 import com.studypulse.sync.data.repository.LocalRepository
@@ -20,6 +22,9 @@ class AppContainer(context: Context) {
 
     val settingsRepository: SettingsRepository =
         SettingsRepository(context.settingsDataStore)
+
+    val profileRepository: ProfileRepository =
+        ProfileRepository(context.profileDataStore)
 
     val database: AppDatabase =
         AppDatabase.getInstance(context)

@@ -21,11 +21,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.studypulse.sync.data.profile.StudentProfile
 import com.studypulse.sync.ui.focus.FocusTimerScreen
 import com.studypulse.sync.ui.materials.MaterialsScreen
 import com.studypulse.sync.ui.ocr.MockOcrScreen
+import com.studypulse.sync.ui.onboarding.OnboardingScreen
 import com.studypulse.sync.ui.packages.PackagesScreen
 import com.studypulse.sync.ui.plan.PlanScreen
 import com.studypulse.sync.ui.qa.QaScreen
@@ -41,12 +45,30 @@ import com.studypulse.sync.ui.theme.StudyPulseTheme
 import com.studypulse.sync.ui.today.TodayScreen
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
-            StudyPulseTheme { StudyPulseApp() }
+            StudyPulseTheme {
+                StudyPulseRoot()
+            }
         }
+    }
+}
+
+@Composable
+fun StudyPulseRoot() {
+    val application = LocalContext.current.applicationContext as StudyPulseApplication
+
+    val profile by application.container.profileRepository.profile
+        .collectAsStateWithLifecycle(initialValue = StudentProfile())
+
+    if (!profile.onboardingCompleted) {
+        OnboardingScreen()
+    } else {
+        StudyPulseApp()
     }
 }
 
@@ -60,7 +82,17 @@ fun StudyPulseApp() {
     var showScheduleImport by remember { mutableStateOf(false) }
     var showMockOcr by remember { mutableStateOf(false) }
 
-    val tabs = listOf("Сегодня", "Пакеты", "Предметы", "Расписание", "Задания", "План", "Материалы", "Статистика", "Настройки")
+    val tabs = listOf(
+        "Сегодня",
+        "Пакеты",
+        "Предметы",
+        "Расписание",
+        "Задания",
+        "План",
+        "Материалы",
+        "Статистика",
+        "Настройки"
+    )
 
     fun clearOverlays() {
         reviewRequest = null
@@ -72,30 +104,60 @@ fun StudyPulseApp() {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(text = "StudyPulse", maxLines = 1, overflow = TextOverflow.Ellipsis) })
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "StudyPulse",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            )
         }
     ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+        ) {
             val currentReview = reviewRequest
             val currentFocusSlotId = focusSlotId
             val currentQaMaterialId = qaMaterialId
 
             when {
                 currentReview != null -> {
-                    ReviewScreen(request = currentReview, onExit = { reviewRequest = null })
+                    ReviewScreen(
+                        request = currentReview,
+                        onExit = { reviewRequest = null }
+                    )
                 }
+
                 currentFocusSlotId != null -> {
-                    FocusTimerScreen(slotId = currentFocusSlotId, onExit = { focusSlotId = null })
+                    FocusTimerScreen(
+                        slotId = currentFocusSlotId,
+                        onExit = { focusSlotId = null }
+                    )
                 }
+
                 currentQaMaterialId != null -> {
-                    QaScreen(materialExternalId = currentQaMaterialId, onExit = { qaMaterialId = null })
+                    QaScreen(
+                        materialExternalId = currentQaMaterialId,
+                        onExit = { qaMaterialId = null }
+                    )
                 }
+
                 showScheduleImport -> {
-                    ScheduleImportScreen(onExit = { showScheduleImport = false })
+                    ScheduleImportScreen(
+                        onExit = { showScheduleImport = false }
+                    )
                 }
+
                 showMockOcr -> {
-                    MockOcrScreen(onExit = { showMockOcr = false })
+                    MockOcrScreen(
+                        onExit = { showMockOcr = false }
+                    )
                 }
+
                 else -> {
                     ScrollableTabRow(
                         selectedTabIndex = selectedTab,
@@ -108,14 +170,21 @@ fun StudyPulseApp() {
                                 selected = selectedTab == index,
                                 onClick = { selectedTab = index },
                                 text = {
-                                    Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
+                                    Text(
+                                        text = title,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
                                 },
                                 modifier = Modifier.padding(horizontal = 12.dp)
                             )
                         }
                     }
 
-                    Column(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                         when (selectedTab) {
                             0 -> TodayScreen(
                                 onOpenFocus = { slotId -> focusSlotId = slotId },
@@ -123,21 +192,36 @@ fun StudyPulseApp() {
                                 onGoToPlan = { selectedTab = 5 },
                                 onGoToTasks = { selectedTab = 4 }
                             )
+
                             1 -> PackagesScreen()
+
                             2 -> SubjectScreen()
-                            3 -> ScheduleScreen(onOpenImport = { showScheduleImport = true })
-                            4 -> TasksScreen(onOpenPlanner = { selectedTab = 5; clearOverlays() })
+
+                            3 -> ScheduleScreen(
+                                onOpenImport = { showScheduleImport = true }
+                            )
+
+                            4 -> TasksScreen(
+                                onOpenPlanner = {
+                                    selectedTab = 5
+                                    clearOverlays()
+                                }
+                            )
+
                             5 -> PlanScreen(
                                 onStartReview = { request -> reviewRequest = request },
                                 onOpenFocus = { slotId -> focusSlotId = slotId },
                                 onOpenQa = { materialId -> qaMaterialId = materialId }
                             )
+
                             6 -> MaterialsScreen(
                                 onStartReview = { request -> reviewRequest = request },
                                 onAsk = { materialId -> qaMaterialId = materialId },
                                 onOpenMockOcr = { showMockOcr = true }
                             )
+
                             7 -> StatsScreen()
+
                             else -> SettingsScreen()
                         }
                     }
