@@ -1,4 +1,8 @@
 package com.studypulse.sync.ui.stats
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +37,16 @@ import java.time.format.DateTimeFormatter
 fun StatsScreen(
     viewModel: StatsViewModel = viewModel()
 ) {
+        LaunchedEffect(Unit) {
+            try { viewModel.refresh() } catch (_: Throwable) { }
+        }
+
+        val lifecycleOwner = LocalLifecycleOwner.current
+        LaunchedEffect(lifecycleOwner) {
+            lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                try { viewModel.refresh() } catch (_: Throwable) { }
+            }
+        }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LazyColumn(
