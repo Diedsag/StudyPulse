@@ -17,6 +17,7 @@ import com.studypulse.sync.data.repository.PackageRepositoryImpl
 import com.studypulse.sync.data.repository.StatsRepository
 import com.studypulse.sync.data.repository.StudyRepository
 import com.studypulse.sync.data.repository.SyncRepository
+import com.studypulse.sync.domain.planning.AutoPlannerCoordinator
 
 class AppContainer(context: Context) {
 
@@ -68,6 +69,12 @@ class AppContainer(context: Context) {
         AssistantRepository(
             database = database,
             studyRepository = studyRepository
+        )
+
+    val autoPlannerCoordinator: AutoPlannerCoordinator =
+        AutoPlannerCoordinator(
+            studyRepository = studyRepository,
+            profileRepository = profileRepository
         )
 
     fun apiService(baseUrl: String): ApiService =

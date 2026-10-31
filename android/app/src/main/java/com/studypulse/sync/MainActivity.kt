@@ -15,6 +15,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,6 +65,12 @@ fun StudyPulseRoot() {
 
     val profile by application.container.profileRepository.profile
         .collectAsStateWithLifecycle(initialValue = StudentProfile())
+
+    LaunchedEffect(profile.onboardingCompleted, profile.autoPlanEnabled) {
+        if (profile.onboardingCompleted && profile.autoPlanEnabled) {
+            application.container.autoPlannerCoordinator.ensureTodayPlan()
+        }
+    }
 
     if (!profile.onboardingCompleted) {
         OnboardingScreen()
