@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.studypulse.sync.StudyPulseApplication
-import com.studypulse.sync.core.datastore.SettingsRepository
+import com.studypulse.sync.notifications.NotificationScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,126 +13,117 @@ import kotlinx.coroutines.launch
 
 data class SettingsUiState(
     val serverUrl: String = "",
-    val savedServerUrl: String = "",
+    val nickname: String = "",
     val deviceUid: String = "",
-    val nickname: String = SettingsRepository.DEFAULT_NICKNAME,
+    val ratingOptIn: Boolean = true,
+    val notificationsEnabled: Boolean = true,
+    val isDirty: Boolean = false,
     val status: ConnectionStatus = ConnectionStatus.Idle,
-    val isDirty: Boolean = false
+    val message: String? = null,
+    val exportedJson: String? = null
 )
 
-sealed interface ConnectionStatus {
-    data object Idle : ConnectionStatus
-    data object Loading : ConnectionStatus
-    data class Connected(val time: String) : ConnectionStatus
-    data class Error(val message: String) : ConnectionStatus
+sealed class ConnectionStatus {
+    object Idle : ConnectionStatus()
+    object Loading : ConnectionStatus()
+    data class Connected(val time: String) : ConnectionStatus()
+    data class Error(val message: String) : ConnectionStatus()
 }
 
-class SettingsViewModel(
-    application: Application
-) : AndroidViewModel(application) {
+class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val container = (application as StudyPulseApplication).container
+    private val settingsRepository = container.settingsRepository
+    private val planExporter = container.planExporter
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
-            val settings = container.settingsRepository.currentSettings()
-
-            _uiState.update { currentState ->
-                currentState.copy(
+            val settings = settingsRepository.currentSettings()
+            _uiState.update {
+                it.copy(
                     serverUrl = settings.serverUrl,
-                    savedServerUrl = settings.serverUrl,
-                    deviceUid = settings.deviceUid,
                     nickname = settings.nickname,
-                    isDirty = false,
-                    status = ConnectionStatus.Idle
+                    deviceUid = settings.deviceUid,
+                    ratingOptIn = settings.ratingOptIn,
+                    notificationsEnabled = settings.notificationsEnabled
                 )
             }
         }
     }
 
     fun onServerUrlChange(value: String) {
-        _uiState.update { currentState ->
-            currentState.copy(
-                serverUrl = value,
-                isDirty = value != currentState.savedServerUrl,
-                status = ConnectionStatus.Idle
-            )
-        }
+        _uiState.update { it.copy(serverUrl = value, isDirty = true) }
     }
 
     fun onNicknameChange(value: String) {
-        _uiState.update { currentState ->
-            currentState.copy(
-                nickname = value,
-                isDirty = true
-            )
+        _uiState.update { it.copy(nickname = value, isDirty = true) }
+    }
+
+    fun onRatingOptInChange(value: Boolean) {
+        _uiState.update { it.copy(ratingOptIn = value, isDirty = true) }
+    }
+
+    fun onNotificationsChange(value: Boolean) {
+        _uiState.update { it.copy(notificationsEnabled = value, isDirty = true) }
+        if (value) {
+            NotificationScheduler.schedulePeriodicNotifications(getApplication())
+        } else {
+            NotificationScheduler.cancelNotifications(getApplication())
         }
+    }
+
+    fun generateDeviceUid() {
+        val newUid = java.util.UUID.randomUUID().toString()
+        _uiState.update { it.copy(deviceUid = newUid, isDirty = true) }
     }
 
     fun saveSettings() {
         viewModelScope.launch {
             val state = _uiState.value
-
-            container.settingsRepository.setServerUrl(state.serverUrl)
-            container.settingsRepository.setNickname(state.nickname)
-
-            val normalized = SettingsRepository.normalizeBaseUrl(state.serverUrl)
-
-            _uiState.update { currentState ->
-                currentState.copy(
-                    serverUrl = normalized,
-                    savedServerUrl = normalized,
-                    nickname = state.nickname.ifBlank { SettingsRepository.DEFAULT_NICKNAME },
-                    isDirty = false
-                )
-            }
-        }
-    }
-
-    fun generateDeviceUid() {
-        viewModelScope.launch {
-            val deviceUid = container.settingsRepository.ensureDeviceUid()
-
-            _uiState.update { currentState ->
-                currentState.copy(deviceUid = deviceUid)
-            }
+            settingsRepository.setServerUrl(state.serverUrl)
+            settingsRepository.setNickname(state.nickname)
+            settingsRepository.setRatingOptIn(state.ratingOptIn)
+            settingsRepository.setNotificationsEnabled(state.notificationsEnabled)
+            _uiState.update { it.copy(isDirty = false, message = "Настройки сохранены") }
         }
     }
 
     fun checkConnection() {
         viewModelScope.launch {
             _uiState.update { it.copy(status = ConnectionStatus.Loading) }
-
             try {
                 val state = _uiState.value
-
-                val rawUrl = if (state.serverUrl.isNotBlank()) {
-                    state.serverUrl
-                } else {
-                    container.settingsRepository.currentSettings().serverUrl
-                }
-
-                val normalizedUrl = SettingsRepository.normalizeBaseUrl(rawUrl)
-                val api = container.apiService(normalizedUrl)
+                val api = container.apiService(state.serverUrl)
                 val health = api.getHealth()
-
-                _uiState.update { currentState ->
-                    currentState.copy(
-                        status = ConnectionStatus.Connected(health.time)
-                    )
+                _uiState.update {
+                    it.copy(status = ConnectionStatus.Connected(health.status))
                 }
             } catch (e: Exception) {
-                _uiState.update { currentState ->
-                    currentState.copy(
-                        status = ConnectionStatus.Error(
-                            message = e.message ?: "Unknown connection error"
-                        )
-                    )
+                _uiState.update {
+                    it.copy(status = ConnectionStatus.Error(e.message ?: "Ошибка подключения"))
                 }
             }
         }
+    }
+
+    fun exportPlan() {
+        viewModelScope.launch {
+            val result = planExporter.exportPlan()
+            result.fold(
+                onSuccess = { json ->
+                    _uiState.update { it.copy(exportedJson = json, message = "План экспортирован") }
+                },
+                onFailure = { error ->
+                    _uiState.update { it.copy(message = "Ошибка экспорта: ${error.message}") }
+                }
+            )
+        }
+    }
+
+    fun clearExportedJson() {
+        _uiState.update { it.copy(exportedJson = null) }
     }
 }

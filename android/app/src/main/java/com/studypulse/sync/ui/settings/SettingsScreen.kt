@@ -15,10 +15,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,17 +46,9 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Подключение",
-                    style = MaterialTheme.typography.titleMedium
-                )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text = "Подключение", style = MaterialTheme.typography.titleMedium)
 
                 OutlinedTextField(
                     value = state.serverUrl,
@@ -77,80 +72,45 @@ fun SettingsScreen(
                 )
 
                 if (state.isDirty) {
-                    Text(
-                        text = "Есть несохранённые изменения",
-                        color = MaterialTheme.colorScheme.tertiary
-                    )
+                    Text(text = "Есть несохранённые изменения", color = MaterialTheme.colorScheme.tertiary)
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(onClick = viewModel::saveSettings) {
-                        Text("Сохранить")
-                    }
-
-                    Button(onClick = viewModel::generateDeviceUid) {
-                        Text("Создать UID")
-                    }
-
-                    Button(onClick = viewModel::checkConnection) {
-                        Text("Проверить")
-                    }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = viewModel::saveSettings) { Text("Сохранить") }
+                    Button(onClick = viewModel::generateDeviceUid) { Text("Создать UID") }
+                    Button(onClick = viewModel::checkConnection) { Text("Проверить") }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 when (val status = state.status) {
-                    is ConnectionStatus.Idle -> {
-                        Text("Статус: ожидание")
-                    }
-
+                    is ConnectionStatus.Idle -> Text("Статус: ожидание")
                     is ConnectionStatus.Loading -> {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp))
                             Text("Проверяем подключение...")
                         }
                     }
-
                     is ConnectionStatus.Connected -> {
                         Text(
                             text = "Подключено. Время сервера: ${status.time}",
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-
                     is ConnectionStatus.Error -> {
-                        Text(
-                            text = "Ошибка: ${status.message}",
-                            color = MaterialTheme.colorScheme.error
-                        )
+                        Text(text = "Ошибка: ${status.message}", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Синхронизация",
-                    style = MaterialTheme.typography.titleMedium
-                )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text = "Синхронизация", style = MaterialTheme.typography.titleMedium)
 
-                Text(
-                    text = "Очередь событий: ${syncState.pendingCount}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
+                Text(text = "Очередь событий: ${syncState.pendingCount}", style = MaterialTheme.typography.bodyMedium)
                 Text(
                     text = "Последняя синхронизация: ${formatTimestamp(syncState.lastSyncAt)}",
                     style = MaterialTheme.typography.bodyMedium
@@ -158,26 +118,13 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = syncViewModel::sync,
-                        enabled = !syncState.isSyncing
-                    ) {
-                        Text("Синхронизировать")
-                    }
-
-                    if (syncState.isSyncing) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp))
-                    }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = syncViewModel::sync, enabled = !syncState.isSyncing) { Text("Синхронизировать") }
+                    if (syncState.isSyncing) CircularProgressIndicator(modifier = Modifier.size(18.dp))
                 }
 
                 syncState.message?.let { message ->
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Text(text = message, style = MaterialTheme.typography.bodyMedium)
                 }
 
                 Text(
@@ -188,25 +135,59 @@ fun SettingsScreen(
             }
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Подсказка",
-                    style = MaterialTheme.typography.titleMedium
-                )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text = "Настройки", style = MaterialTheme.typography.titleMedium)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "Участие в рейтинге", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = state.ratingOptIn, onCheckedChange = viewModel::onRatingOptInChange)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "Уведомления", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = state.notificationsEnabled, onCheckedChange = viewModel::onNotificationsChange)
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text = "Экспорт плана", style = MaterialTheme.typography.titleMedium)
 
                 Text(
-                    text = "Для Android emulator обычно используйте: http://10.0.2.2:5000"
+                    text = "Экспортировать план, расписание, задания и материалы в JSON для резервного копирования.",
+                    style = MaterialTheme.typography.bodySmall
                 )
 
-                Text(
-                    text = "Для физического устройства используйте IP компьютера, например: http://192.168.1.77:5000"
-                )
+                Button(onClick = viewModel::exportPlan, modifier = Modifier.fillMaxWidth()) {
+                    Text("Экспортировать в JSON")
+                }
+
+                state.exportedJson?.let { json ->
+                    Text(
+                        text = "JSON готов (${json.length} символов). Скопируйте из логката или сохраните в файл.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    OutlinedButton(onClick = viewModel::clearExportedJson) { Text("Очистить") }
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text = "Подсказка", style = MaterialTheme.typography.titleMedium)
+                Text(text = "Для Android emulator обычно используйте: http://10.0.2.2:5000")
+                Text(text = "Для физического устройства используйте IP компьютера, например: http://192.168.1.77:5000")
             }
         }
     }
@@ -214,13 +195,9 @@ fun SettingsScreen(
 
 private fun formatTimestamp(value: Long?): String {
     if (value == null) return "—"
-
     return try {
-        Instant
-            .ofEpochMilli(value)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDateTime()
-            .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+        Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault())
+            .toLocalDateTime().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
     } catch (_: Throwable) {
         "—"
     }

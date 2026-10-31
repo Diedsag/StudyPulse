@@ -19,6 +19,7 @@ object SettingsKeys {
     val DEVICE_UID = stringPreferencesKey("device_uid")
     val NICKNAME = stringPreferencesKey("nickname")
     val RATING_OPT_IN = booleanPreferencesKey("rating_opt_in")
+    val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
     val LAST_SYNC_AT = longPreferencesKey("last_sync_at")
 }
 
@@ -27,6 +28,7 @@ data class AppSettings(
     val deviceUid: String,
     val nickname: String,
     val ratingOptIn: Boolean,
+    val notificationsEnabled: Boolean,
     val lastSyncAt: Long?
 )
 
@@ -44,12 +46,11 @@ class SettingsRepository(
         }
         .map { preferences ->
             AppSettings(
-                serverUrl = normalizeBaseUrl(
-                    preferences[SettingsKeys.SERVER_URL] ?: DEFAULT_SERVER_URL
-                ),
+                serverUrl = preferences[SettingsKeys.SERVER_URL] ?: DEFAULT_SERVER_URL,
                 deviceUid = preferences[SettingsKeys.DEVICE_UID] ?: "",
                 nickname = preferences[SettingsKeys.NICKNAME] ?: DEFAULT_NICKNAME,
                 ratingOptIn = preferences[SettingsKeys.RATING_OPT_IN] ?: true,
+                notificationsEnabled = preferences[SettingsKeys.NOTIFICATIONS_ENABLED] ?: true,
                 lastSyncAt = preferences[SettingsKeys.LAST_SYNC_AT]
             )
         }
@@ -92,6 +93,12 @@ class SettingsRepository(
         }
     }
 
+    suspend fun setNotificationsEnabled(value: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[SettingsKeys.NOTIFICATIONS_ENABLED] = value
+        }
+    }
+
     suspend fun setLastSyncAt(timestamp: Long) {
         dataStore.edit { preferences ->
             preferences[SettingsKeys.LAST_SYNC_AT] = timestamp
@@ -103,31 +110,17 @@ class SettingsRepository(
         const val DEFAULT_NICKNAME = "Student Demo"
 
         fun normalizeBaseUrl(rawUrl: String): String {
-            var url = rawUrl.trim()
+            val trimmed = rawUrl.trim()
 
-            if (url.isBlank()) {
+            if (trimmed.isBlank()) {
                 return DEFAULT_SERVER_URL
             }
 
-            if (!url.startsWith("http://", ignoreCase = true) &&
-                !url.startsWith("https://", ignoreCase = true)
-            ) {
-                url = "http://$url"
+            return if (trimmed.endsWith("/")) {
+                trimmed
+            } else {
+                "$trimmed/"
             }
-
-            while (url.endsWith("/")) {
-                url = url.dropLast(1)
-            }
-
-            if (url.endsWith("/health", ignoreCase = true)) {
-                url = url.dropLast("/health".length)
-            }
-
-            while (url.endsWith("/")) {
-                url = url.dropLast(1)
-            }
-
-            return "$url/"
         }
     }
 }

@@ -61,16 +61,16 @@ interface SubjectDao {
 interface ScheduleDao {
     @Query(
         "SELECT s.* FROM schedule_items s " +
-            "LEFT JOIN packages p ON s.packageExternalId = p.externalId " +
-            "WHERE s.source = 'LOCAL' OR p.isDownloaded = 1 " +
-            "ORDER BY s.dayOfWeek, s.startTime"
+        "LEFT JOIN packages p ON s.packageExternalId = p.externalId " +
+        "WHERE s.source = 'LOCAL' OR p.isDownloaded = 1 " +
+        "ORDER BY s.dayOfWeek, s.startTime"
     )
     fun observeActive(): Flow<List<ScheduleItemEntity>>
 
     @Query(
         "SELECT s.* FROM schedule_items s " +
-            "LEFT JOIN packages p ON s.packageExternalId = p.externalId " +
-            "WHERE s.source = 'LOCAL' OR p.isDownloaded = 1"
+        "LEFT JOIN packages p ON s.packageExternalId = p.externalId " +
+        "WHERE s.source = 'LOCAL' OR p.isDownloaded = 1"
     )
     suspend fun getAllActiveOnce(): List<ScheduleItemEntity>
 
@@ -88,29 +88,29 @@ interface ScheduleDao {
 interface TaskDao {
     @Query(
         "SELECT t.* FROM tasks t " +
-            "LEFT JOIN packages p ON t.packageExternalId = p.externalId " +
-            "WHERE t.source = 'LOCAL' OR p.isDownloaded = 1 " +
-            "ORDER BY t.deadlineDate, t.priority DESC"
+        "LEFT JOIN packages p ON t.packageExternalId = p.externalId " +
+        "WHERE t.source = 'LOCAL' OR p.isDownloaded = 1 " +
+        "ORDER BY t.deadlineDate, t.priority DESC"
     )
     fun observeActive(): Flow<List<TaskEntity>>
 
     @Query(
         "SELECT t.* FROM tasks t " +
-            "LEFT JOIN packages p ON t.packageExternalId = p.externalId " +
-            "WHERE (t.source = 'LOCAL' OR p.isDownloaded = 1) " +
-                "AND t.status <> 'DONE' AND t.remainingMinutes > 0 " +
-            "ORDER BY t.deadlineDate ASC, t.priority DESC, t.remainingMinutes DESC"
+        "LEFT JOIN packages p ON t.packageExternalId = p.externalId " +
+        "WHERE (t.source = 'LOCAL' OR p.isDownloaded = 1) " +
+        "AND t.status <> 'DONE' AND t.remainingMinutes > 0 " +
+        "ORDER BY t.deadlineDate ASC, t.priority DESC, t.remainingMinutes DESC"
     )
     suspend fun getActiveOnce(): List<TaskEntity>
 
     @Query(
         "SELECT t.* FROM tasks t " +
-            "LEFT JOIN packages p ON t.packageExternalId = p.externalId " +
-            "WHERE (t.source = 'LOCAL' OR p.isDownloaded = 1) " +
-                "AND t.status <> 'DONE' AND t.remainingMinutes > 0 " +
-                "AND t.deadlineDate <= :deadlineThreshold " +
-            "ORDER BY t.deadlineDate ASC, t.priority DESC " +
-            "LIMIT :limit"
+        "LEFT JOIN packages p ON t.packageExternalId = p.externalId " +
+        "WHERE (t.source = 'LOCAL' OR p.isDownloaded = 1) " +
+        "AND t.status <> 'DONE' AND t.remainingMinutes > 0 " +
+        "AND t.deadlineDate <= :deadlineThreshold " +
+        "ORDER BY t.deadlineDate ASC, t.priority DESC " +
+        "LIMIT :limit"
     )
     suspend fun getUrgentOnce(deadlineThreshold: String, limit: Int): List<TaskEntity>
 
@@ -137,16 +137,16 @@ interface TaskDao {
 interface MaterialDao {
     @Query(
         "SELECT m.* FROM materials m " +
-            "LEFT JOIN packages p ON m.packageExternalId = p.externalId " +
-            "WHERE m.source = 'LOCAL' OR p.isDownloaded = 1 " +
-            "ORDER BY m.title COLLATE NOCASE ASC"
+        "LEFT JOIN packages p ON m.packageExternalId = p.externalId " +
+        "WHERE m.source = 'LOCAL' OR p.isDownloaded = 1 " +
+        "ORDER BY m.title COLLATE NOCASE ASC"
     )
     fun observeActive(): Flow<List<MaterialEntity>>
 
     @Query(
         "SELECT m.* FROM materials m " +
-            "LEFT JOIN packages p ON m.packageExternalId = p.externalId " +
-            "WHERE m.source = 'LOCAL' OR p.isDownloaded = 1"
+        "LEFT JOIN packages p ON m.packageExternalId = p.externalId " +
+        "WHERE m.source = 'LOCAL' OR p.isDownloaded = 1"
     )
     suspend fun getAllActiveOnce(): List<MaterialEntity>
 
@@ -208,34 +208,53 @@ interface ClassInstanceDao {
 @Dao
 interface StudySlotDao {
     @Query(
-        "SELECT s.*, t.title AS taskTitle, t.subject AS taskSubject, " +
-            "t.deadlineDate AS taskDeadline, t.priority AS taskPriority, m.title AS materialTitle " +
-            "FROM study_slots s " +
-            "INNER JOIN tasks t ON s.taskExternalId = t.externalId " +
-            "LEFT JOIN materials m ON s.materialExternalId = m.externalId " +
-            "WHERE s.status = :status ORDER BY s.startDateTime ASC"
+        "SELECT " +
+        "s.id, s.taskExternalId, s.packageExternalId, s.startDateTime, s.endDateTime, " +
+        "s.status, s.materialExternalId, s.createdAt, " +
+        "t.title AS taskTitle, " +
+        "t.subject AS taskSubject, " +
+        "t.deadlineDate AS taskDeadline, " +
+        "t.priority AS taskPriority, " +
+        "m.title AS materialTitle " +
+        "FROM study_slots s " +
+        "INNER JOIN tasks t ON s.taskExternalId = t.externalId " +
+        "LEFT JOIN materials m ON s.materialExternalId = m.externalId " +
+        "WHERE s.status = :status " +
+        "ORDER BY s.startDateTime ASC"
     )
     fun observeWithTaskMaterial(status: String): Flow<List<SlotWithTaskMaterial>>
 
     @Query(
-        "SELECT s.*, t.title AS taskTitle, t.subject AS taskSubject, " +
-            "t.deadlineDate AS taskDeadline, t.priority AS taskPriority, m.title AS materialTitle " +
-            "FROM study_slots s " +
-            "INNER JOIN tasks t ON s.taskExternalId = t.externalId " +
-            "LEFT JOIN materials m ON s.materialExternalId = m.externalId " +
-            "WHERE s.startDateTime >= :dayStart AND s.startDateTime < :dayEnd " +
-            "ORDER BY s.startDateTime ASC"
+        "SELECT " +
+        "s.id, s.taskExternalId, s.packageExternalId, s.startDateTime, s.endDateTime, " +
+        "s.status, s.materialExternalId, s.createdAt, " +
+        "t.title AS taskTitle, " +
+        "t.subject AS taskSubject, " +
+        "t.deadlineDate AS taskDeadline, " +
+        "t.priority AS taskPriority, " +
+        "m.title AS materialTitle " +
+        "FROM study_slots s " +
+        "INNER JOIN tasks t ON s.taskExternalId = t.externalId " +
+        "LEFT JOIN materials m ON s.materialExternalId = m.externalId " +
+        "WHERE s.startDateTime >= :dayStart AND s.startDateTime < :dayEnd " +
+        "ORDER BY s.startDateTime ASC"
     )
     suspend fun getSlotsForDayOnce(dayStart: Long, dayEnd: Long): List<SlotWithTaskMaterial>
 
     @Query(
-        "SELECT s.*, t.title AS taskTitle, t.subject AS taskSubject, " +
-            "t.deadlineDate AS taskDeadline, t.priority AS taskPriority, m.title AS materialTitle " +
-            "FROM study_slots s " +
-            "INNER JOIN tasks t ON s.taskExternalId = t.externalId " +
-            "LEFT JOIN materials m ON s.materialExternalId = m.externalId " +
-            "WHERE s.status IN ('PLANNED','IN_PROGRESS') AND s.endDateTime >= :now " +
-            "ORDER BY s.startDateTime ASC LIMIT 1"
+        "SELECT " +
+        "s.id, s.taskExternalId, s.packageExternalId, s.startDateTime, s.endDateTime, " +
+        "s.status, s.materialExternalId, s.createdAt, " +
+        "t.title AS taskTitle, " +
+        "t.subject AS taskSubject, " +
+        "t.deadlineDate AS taskDeadline, " +
+        "t.priority AS taskPriority, " +
+        "m.title AS materialTitle " +
+        "FROM study_slots s " +
+        "INNER JOIN tasks t ON s.taskExternalId = t.externalId " +
+        "LEFT JOIN materials m ON s.materialExternalId = m.externalId " +
+        "WHERE s.status IN ('PLANNED','IN_PROGRESS') AND s.endDateTime >= :now " +
+        "ORDER BY s.startDateTime ASC LIMIT 1"
     )
     suspend fun getNextSlotOnce(now: Long): SlotWithTaskMaterial?
 
@@ -244,6 +263,22 @@ interface StudySlotDao {
 
     @Query("SELECT * FROM study_slots WHERE status IN ('PLANNED','IN_PROGRESS','DONE','MISSED')")
     suspend fun getCommittedOnce(): List<StudySlotEntity>
+
+    @Query(
+        "SELECT " +
+        "s.id, s.taskExternalId, s.packageExternalId, s.startDateTime, s.endDateTime, " +
+        "s.status, s.materialExternalId, s.createdAt, " +
+        "t.title AS taskTitle, " +
+        "t.subject AS taskSubject, " +
+        "t.deadlineDate AS taskDeadline, " +
+        "t.priority AS taskPriority, " +
+        "m.title AS materialTitle " +
+        "FROM study_slots s " +
+        "INNER JOIN tasks t ON s.taskExternalId = t.externalId " +
+        "LEFT JOIN materials m ON s.materialExternalId = m.externalId " +
+        "WHERE s.startDateTime >= :startMillis AND s.startDateTime < :endMillis AND s.status = 'PLANNED'"
+    )
+    suspend fun getUpcomingSlotsOnce(startMillis: Long, endMillis: Long): List<SlotWithTaskMaterial>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<StudySlotEntity>)
