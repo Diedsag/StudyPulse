@@ -23,6 +23,7 @@ import androidx.glance.text.TextStyle
 import com.studypulse.sync.MainActivity
 import com.studypulse.sync.StudyPulseApplication
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -30,24 +31,42 @@ class StudyPulseWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val container = (context.applicationContext as StudyPulseApplication).container
-        val repository = container.studyRepository
 
-        val todaySnapshot = repository.getTodaySnapshot()
+        val profile = container.profileRepository.currentProfile()
+        val now = System.currentTimeMillis()
+
+        val nextSlot = container.database.studySlotDao().getNextSlotOnce(now)
+        val dueCards = container.database.cardDao().countDueOnce(now)
+
+        val tomorrow = LocalDate.now().plusDays(1).toString()
+        val urgentCount = container.database.taskDao().getUrgentOnce(tomorrow, 10).size
 
         provideContent {
             GlanceTheme {
-                WidgetContent(todaySnapshot.getOrNull())
+                WidgetContent(
+                    displayName = profile.displayName,
+                    taskTitle = nextSlot?.taskTitle,
+                    startEpochMillis = nextSlot?.slot?.startDateTime,
+                    dueCards = dueCards,
+                    urgentCount = urgentCount
+                )
             }
         }
     }
 
     @Composable
-    private fun WidgetContent(snapshot: com.studypulse.sync.data.repository.TodaySnapshot?) {
+    private fun WidgetContent(
+        displayName: String,
+        taskTitle: String?,
+        startEpochMillis: Long?,
+        dueCards: Int,
+        urgentCount: Int
+    ) {
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.surface)
-                .padding(16.dp)
+                .padding(14.dp)
                 .clickable(actionStartActivity<MainActivity>()),
             verticalAlignment = Alignment.Top,
             horizontalAlignment = Alignment.Start
@@ -55,62 +74,74 @@ class StudyPulseWidget : GlanceAppWidget() {
             Text(
                 text = "StudyPulse",
                 style = TextStyle(
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = GlanceTheme.colors.primary
                 )
             )
 
-            if (snapshot != null) {
+            if (displayName.isNotBlank()) {
                 Text(
-                    text = snapshot.dateLabel,
+                    text = "Привет, $displayName",
                     style = TextStyle(
                         fontSize = 12.sp,
-                        color = GlanceTheme.colors.onSurfaceVariant
+                        color = GlanceTheme.colors.onSurface
+                    )
+                )
+            }
+
+            Text(
+                text = LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM")),
+                style = TextStyle(
+                    fontSize = 12.sp,
+                    color = GlanceTheme.colors.onSurface
+                )
+            )
+
+            if (taskTitle != null && startEpochMillis != null) {
+                Text(
+                    text = "Ближайшее: $taskTitle",
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = GlanceTheme.colors.onSurface
                     )
                 )
 
-                snapshot.nextSlot?.let { slot ->
-                    val time = formatTime(slot.slot.startDateTime)
-                    Text(
-                        text = "Ближайший слот: $time",
-                        style = TextStyle(
-                            fontSize = 14.sp,
-                            color = GlanceTheme.colors.onSurface
-                        )
+                Text(
+                    text = formatTime(startEpochMillis),
+                    style = TextStyle(
+                        fontSize = 12.sp,
+                        color = GlanceTheme.colors.primary
                     )
-                    Text(
-                        text = slot.taskTitle,
-                        style = TextStyle(
-                            fontSize = 12.sp,
-                            color = GlanceTheme.colors.onSurfaceVariant
-                        )
-                    )
-                } ?: run {
-                    Text(
-                        text = "Нет ближайших слотов",
-                        style = TextStyle(
-                            fontSize = 14.sp,
-                            color = GlanceTheme.colors.onSurfaceVariant
-                        )
-                    )
-                }
-
-                if (snapshot.dueCardsCount > 0) {
-                    Text(
-                        text = "Карточек к повторению: ${snapshot.dueCardsCount}",
-                        style = TextStyle(
-                            fontSize = 12.sp,
-                            color = GlanceTheme.colors.tertiary
-                        )
-                    )
-                }
+                )
             } else {
                 Text(
-                    text = "Откройте приложение",
+                    text = "Нет ближайших слотов",
                     style = TextStyle(
-                        fontSize = 14.sp,
-                        color = GlanceTheme.colors.onSurfaceVariant
+                        fontSize = 13.sp,
+                        color = GlanceTheme.colors.onSurface
+                    )
+                )
+            }
+
+            if (dueCards > 0) {
+                Text(
+                    text = "Карточек: $dueCards",
+                    style = TextStyle(
+                        fontSize = 12.sp,
+                        color = GlanceTheme.colors.onSurface
+                    )
+                )
+            }
+
+            if (urgentCount > 0) {
+                Text(
+                    text = "Срочных заданий: $urgentCount",
+                    style = TextStyle(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = GlanceTheme.colors.primary
                     )
                 )
             }

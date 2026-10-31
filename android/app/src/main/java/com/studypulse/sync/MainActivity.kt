@@ -44,6 +44,7 @@ import com.studypulse.sync.ui.subjects.SubjectScreen
 import com.studypulse.sync.ui.tasks.TasksScreen
 import com.studypulse.sync.ui.theme.StudyPulseTheme
 import com.studypulse.sync.ui.today.TodayScreen
+import com.studypulse.sync.widget.WidgetScheduler
 
 class MainActivity : ComponentActivity() {
 
@@ -66,13 +67,24 @@ fun StudyPulseRoot() {
     val profile by application.container.profileRepository.profile
         .collectAsStateWithLifecycle(initialValue = StudentProfile())
 
-    LaunchedEffect(profile.onboardingCompleted, profile.autoPlanEnabled, profile.notificationsEnabled) {
+    LaunchedEffect(
+        profile.onboardingCompleted,
+        profile.autoPlanEnabled,
+        profile.notificationsEnabled,
+        profile.slotRemindersEnabled,
+        profile.deadlineRemindersEnabled,
+        profile.morningDigestEnabled
+    ) {
         if (profile.onboardingCompleted) {
             if (profile.autoPlanEnabled) {
                 application.container.autoPlannerCoordinator.ensureTodayPlan()
             }
+
             application.container.reminderScheduler.scheduleForToday()
             application.container.reminderScheduler.scheduleDeadlineReminders()
+            application.container.reminderScheduler.scheduleMorningDigest()
+
+            WidgetScheduler.updateSoon(application)
         }
     }
 
