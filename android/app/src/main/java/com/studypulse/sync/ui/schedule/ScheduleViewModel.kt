@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.studypulse.sync.StudyPulseApplication
-import com.studypulse.sync.data.local.entity.ScheduleItemEntity
 import com.studypulse.sync.data.local.entity.SubjectEntity
 import com.studypulse.sync.data.repository.ClassOccurrence
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,23 +32,35 @@ data class ScheduleUiState(
     val canUndo: Boolean = false
 )
 
-class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
+class ScheduleViewModel(
+    application: Application
+) : AndroidViewModel(application) {
+
     private val container = (application as StudyPulseApplication).container
     private val studyRepository = container.studyRepository
     private val localRepository = container.localRepository
+
     private val _uiState = MutableStateFlow(ScheduleUiState())
     val uiState: StateFlow<ScheduleUiState> = _uiState.asStateFlow()
+
     private var undoAction: (suspend () -> Unit)? = null
 
     init {
         viewModelScope.launch {
             studyRepository.upcomingOccurrences(daysAhead = 7).collect { occurrences ->
                 val sorted = runCatching {
-                    occurrences.sortedWith(compareBy({ it.date }, { it.startTime }))
+                    occurrences.sortedWith(
+                        compareBy(
+                            { it.date },
+                            { it.startTime }
+                        )
+                    )
                 }.getOrDefault(occurrences)
+
                 _uiState.update { it.copy(occurrences = sorted) }
             }
         }
+
         viewModelScope.launch {
             localRepository.subjects.collect { subjects ->
                 _uiState.update { it.copy(subjects = subjects) }
@@ -57,35 +68,66 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun toggleForm() = _uiState.update { it.copy(isFormOpen = !it.isFormOpen, message = null) }
+    fun toggleForm() = _uiState.update {
+        it.copy(isFormOpen = !it.isFormOpen, message = null)
+    }
 
     fun startAdd() {
         _uiState.update {
             it.copy(
-                isFormOpen = true, editingExternalId = null, selectedSubjectId = null, subjectName = "",
-                lessonType = "лекция", dayOfWeek = LocalDate.now().dayOfWeek.value, startTime = "09:00",
-                endTime = "10:30", room = "", teacher = "", parity = "EVERY", message = null
+                isFormOpen = true,
+                editingExternalId = null,
+                selectedSubjectId = null,
+                subjectName = "",
+                lessonType = "лекция",
+                dayOfWeek = LocalDate.now().dayOfWeek.value,
+                startTime = "09:00",
+                endTime = "10:30",
+                room = "",
+                teacher = "",
+                parity = "EVERY",
+                message = null
             )
         }
     }
 
     fun startEdit(occurrence: ClassOccurrence) {
         if (occurrence.source != "LOCAL") {
-            _uiState.update { it.copy(message = "Редактировать можно только локальные занятия") }
+            _uiState.update {
+                it.copy(message = "Редактировать можно только локальные занятия")
+            }
             return
         }
+
         _uiState.update {
             it.copy(
-                isFormOpen = true, editingExternalId = occurrence.templateExternalId, selectedSubjectId = occurrence.subjectId,
-                subjectName = occurrence.subject, lessonType = occurrence.lessonType.orEmpty(), dayOfWeek = occurrence.dayOfWeek,
-                startTime = occurrence.startTime, endTime = occurrence.endTime, room = occurrence.room.orEmpty(),
-                teacher = occurrence.teacher.orEmpty(), parity = occurrence.parity ?: "EVERY", message = null
+                isFormOpen = true,
+                editingExternalId = occurrence.templateExternalId,
+                selectedSubjectId = occurrence.subjectId,
+                subjectName = occurrence.subject,
+                lessonType = occurrence.lessonType.orEmpty(),
+                dayOfWeek = occurrence.dayOfWeek,
+                startTime = occurrence.startTime,
+                endTime = occurrence.endTime,
+                room = occurrence.room.orEmpty(),
+                teacher = occurrence.teacher.orEmpty(),
+                parity = occurrence.parity ?: "EVERY",
+                message = null
             )
         }
     }
 
-    fun selectSubject(subject: SubjectEntity?) = _uiState.update { it.copy(selectedSubjectId = subject?.id, subjectName = subject?.name.orEmpty()) }
-    fun onSubjectNameChange(v: String) = _uiState.update { it.copy(subjectName = v, selectedSubjectId = null) }
+    fun selectSubject(subject: SubjectEntity?) = _uiState.update {
+        it.copy(
+            selectedSubjectId = subject?.id,
+            subjectName = subject?.name.orEmpty()
+        )
+    }
+
+    fun onSubjectNameChange(v: String) = _uiState.update {
+        it.copy(subjectName = v, selectedSubjectId = null)
+    }
+
     fun onLessonTypeChange(v: String) = _uiState.update { it.copy(lessonType = v) }
     fun onDayOfWeekChange(v: Int) = _uiState.update { it.copy(dayOfWeek = v) }
     fun onStartTimeChange(v: String) = _uiState.update { it.copy(startTime = v) }
@@ -97,21 +139,46 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     fun save() {
         viewModelScope.launch {
             val s = _uiState.value
+
             val result = if (s.editingExternalId == null) {
                 localRepository.createScheduleTemplate(
-                    s.selectedSubjectId, s.subjectName, s.lessonType, s.dayOfWeek,
-                    s.startTime, s.endTime, s.room, s.teacher, s.parity
+                    s.selectedSubjectId,
+                    s.subjectName,
+                    s.lessonType,
+                    s.dayOfWeek,
+                    s.startTime,
+                    s.endTime,
+                    s.room,
+                    s.teacher,
+                    s.parity
                 )
             } else {
                 localRepository.updateScheduleTemplate(
-                    s.editingExternalId, s.selectedSubjectId, s.subjectName, s.lessonType, s.dayOfWeek,
-                    s.startTime, s.endTime, s.room, s.teacher, s.parity
+                    s.editingExternalId,
+                    s.selectedSubjectId,
+                    s.subjectName,
+                    s.lessonType,
+                    s.dayOfWeek,
+                    s.startTime,
+                    s.endTime,
+                    s.room,
+                    s.teacher,
+                    s.parity
                 )
             }
+
             _uiState.update { cur ->
                 result.fold(
-                    onSuccess = { cur.copy(isFormOpen = false, editingExternalId = null, message = "Занятие сохранено") },
-                    onFailure = { e -> cur.copy(message = e.message ?: "Не удалось сохранить занятие") }
+                    onSuccess = {
+                        cur.copy(
+                            isFormOpen = false,
+                            editingExternalId = null,
+                            message = "Занятие сохранено"
+                        )
+                    },
+                    onFailure = { e ->
+                        cur.copy(message = e.message ?: "Не удалось сохранить занятие")
+                    }
                 )
             }
         }
@@ -119,14 +186,30 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
 
     fun cancelOccurrence(occurrence: ClassOccurrence) {
         viewModelScope.launch {
-            val result = studyRepository.cancelOccurrence(occurrence.templateExternalId, occurrence.date)
+            val result = studyRepository.cancelOccurrence(
+                occurrence.templateExternalId,
+                occurrence.date
+            )
+
             _uiState.update { cur ->
                 result.fold(
                     onSuccess = {
-                        undoAction = { studyRepository.restoreOccurrence(occurrence.templateExternalId, occurrence.date) }
-                        cur.copy(message = "Занятие отменено", snackbar = "Занятие отменено", canUndo = true)
+                        undoAction = {
+                            studyRepository.restoreOccurrence(
+                                occurrence.templateExternalId,
+                                occurrence.date
+                            )
+                        }
+
+                        cur.copy(
+                            message = "Занятие отменено",
+                            snackbar = "Занятие отменено",
+                            canUndo = true
+                        )
                     },
-                    onFailure = { e -> cur.copy(message = e.message ?: "Не удалось отменить занятие") }
+                    onFailure = { e ->
+                        cur.copy(message = e.message ?: "Не удалось отменить занятие")
+                    }
                 )
             }
         }
@@ -136,13 +219,23 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val snapshot = localRepository.getScheduleTemplate(occurrence.templateExternalId)
             val result = localRepository.deleteScheduleTemplate(occurrence.templateExternalId)
+
             _uiState.update { cur ->
                 result.fold(
                     onSuccess = {
-                        undoAction = { snapshot?.let { localRepository.restoreScheduleTemplate(it) } }
-                        cur.copy(message = "Шаблон занятия удалён", snackbar = "Занятие удалено", canUndo = true)
+                        undoAction = {
+                            snapshot?.let { localRepository.restoreScheduleTemplate(it) }
+                        }
+
+                        cur.copy(
+                            message = "Шаблон занятия удалён",
+                            snackbar = "Занятие удалено",
+                            canUndo = true
+                        )
                     },
-                    onFailure = { e -> cur.copy(message = e.message ?: "Не удалось удалить шаблон") }
+                    onFailure = { e ->
+                        cur.copy(message = e.message ?: "Не удалось удалить шаблон")
+                    }
                 )
             }
         }
@@ -151,11 +244,20 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     fun undo() {
         viewModelScope.launch {
             val action = undoAction ?: return@launch
+
             action()
             undoAction = null
-            _uiState.update { it.copy(snackbar = "Действие отменено", canUndo = false) }
+
+            _uiState.update {
+                it.copy(
+                    snackbar = "Действие отменено",
+                    canUndo = false
+                )
+            }
         }
     }
 
-    fun consumeSnackbar() = _uiState.update { it.copy(snackbar = null, canUndo = false) }
+    fun consumeSnackbar() = _uiState.update {
+        it.copy(snackbar = null, canUndo = false)
+    }
 }

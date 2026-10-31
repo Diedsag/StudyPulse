@@ -2,6 +2,8 @@ package com.studypulse.sync.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,8 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -48,6 +48,7 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val syncState by syncViewModel.uiState.collectAsStateWithLifecycle()
+
     var devExpanded by remember { mutableStateOf(false) }
     var restoreDialogBackup by remember { mutableStateOf<BackupInfo?>(null) }
 
@@ -59,7 +60,10 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Text(
                     text = "Привет, ${state.displayName.ifBlank { "Студент" }}",
                     style = MaterialTheme.typography.titleMedium
@@ -91,7 +95,10 @@ fun SettingsScreen(
 
         if (state.profileNotificationsEnabled) {
             Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Text(text = "Типы напоминаний", style = MaterialTheme.typography.titleMedium)
 
                     SwitchRow(
@@ -125,10 +132,9 @@ fun SettingsScreen(
                     )
 
                     if (state.quietHoursEnabled) {
-                        Row(
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             CounterCell(
                                 label = "С",
@@ -136,6 +142,7 @@ fun SettingsScreen(
                                 onDecrement = viewModel::decrementQuietStart,
                                 onIncrement = viewModel::incrementQuietStart
                             )
+
                             CounterCell(
                                 label = "До",
                                 value = "${state.quietHoursEnd.toString().padStart(2, '0')}:00",
@@ -149,8 +156,12 @@ fun SettingsScreen(
         }
 
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Text(text = "Резервная копия", style = MaterialTheme.typography.titleMedium)
+
                 Text(
                     text = "Сохрани копию плана, расписания, заданий и материалов на устройстве.",
                     style = MaterialTheme.typography.bodySmall,
@@ -166,17 +177,20 @@ fun SettingsScreen(
                         CircularProgressIndicator(modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                     }
+
                     Text(if (state.isCreatingBackup) "Создание..." else "Создать резервную копию")
                 }
 
                 if (state.backups.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
+
                     Text(text = "Доступные копии:", style = MaterialTheme.typography.labelMedium)
-                    LazyColumn(
+
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(state.backups) { backup ->
+                        state.backups.forEach { backup ->
                             BackupItem(
                                 backup = backup,
                                 onRestore = { restoreDialogBackup = backup },
@@ -186,19 +200,29 @@ fun SettingsScreen(
                     }
                 }
 
-                state.message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
+                state.message?.let {
+                    Text(text = it, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
 
         if (restoreDialogBackup != null) {
+            val backup = restoreDialogBackup
+
             AlertDialog(
                 onDismissRequest = { restoreDialogBackup = null },
                 title = { Text("Восстановить копию?") },
-                text = { Text("Текущие данные будут заменены данными из копии от ${restoreDialogBackup?.formattedDate()}.") },
+                text = {
+                    Text(
+                        "Текущие данные будут заменены данными из копии от ${backup?.formattedDate()}."
+                    )
+                },
                 confirmButton = {
                     Button(
                         onClick = {
-                            viewModel.restoreBackup(restoreDialogBackup!!.path)
+                            backup?.let { selected ->
+                                viewModel.restoreBackup(selected.path)
+                            }
                             restoreDialogBackup = null
                         },
                         enabled = !state.isRestoringBackup
@@ -207,19 +231,31 @@ fun SettingsScreen(
                             CircularProgressIndicator(modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                         }
+
                         Text(if (state.isRestoringBackup) "Восстановление..." else "Восстановить")
                     }
                 },
                 dismissButton = {
-                    OutlinedButton(onClick = { restoreDialogBackup = null }) { Text("Отмена") }
+                    OutlinedButton(onClick = { restoreDialogBackup = null }) {
+                        Text("Отмена")
+                    }
                 }
             )
         }
 
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 TextButton(onClick = { devExpanded = !devExpanded }) {
-                    Text(text = if (devExpanded) "Скрыть для разработчиков" else "Для разработчиков")
+                    Text(
+                        text = if (devExpanded) {
+                            "Скрыть для разработчиков"
+                        } else {
+                            "Для разработчиков"
+                        }
+                    )
                 }
 
                 if (devExpanded) {
@@ -230,6 +266,7 @@ fun SettingsScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
                     OutlinedTextField(
                         value = state.nickname,
                         onValueChange = viewModel::onNicknameChange,
@@ -237,42 +274,74 @@ fun SettingsScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
                     Text(
                         text = "UID устройства: ${state.deviceUid.ifBlank { "не задан" }}",
                         style = MaterialTheme.typography.bodySmall
                     )
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(text = "Участие в рейтинге", style = MaterialTheme.typography.bodyMedium)
-                        Switch(checked = state.ratingOptIn, onCheckedChange = viewModel::onRatingOptInChange)
+
+                        Switch(
+                            checked = state.ratingOptIn,
+                            onCheckedChange = viewModel::onRatingOptInChange
+                        )
                     }
+
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = viewModel::saveSettings) { Text("Сохранить") }
-                        OutlinedButton(onClick = viewModel::generateDeviceUid) { Text("Новый UID") }
-                        OutlinedButton(onClick = viewModel::checkConnection) { Text("Проверить") }
-                    }
-                    when (val status = state.status) {
-                        is ConnectionStatus.Idle -> Text("Статус: ожидание", style = MaterialTheme.typography.bodySmall)
-                        is ConnectionStatus.Loading -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                            Text("Проверяем...")
+                        Button(onClick = viewModel::saveSettings) {
+                            Text("Сохранить")
                         }
-                        is ConnectionStatus.Connected -> Text(
-                            text = "Подключено. Время сервера: ${status.time}",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        is ConnectionStatus.Error -> Text(
-                            text = "Ошибка: ${status.message}",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
+
+                        OutlinedButton(onClick = viewModel::generateDeviceUid) {
+                            Text("Новый UID")
+                        }
+
+                        OutlinedButton(onClick = viewModel::checkConnection) {
+                            Text("Проверить")
+                        }
                     }
+
+                    when (val status = state.status) {
+                        is ConnectionStatus.Idle -> {
+                            Text("Статус: ожидание", style = MaterialTheme.typography.bodySmall)
+                        }
+
+                        is ConnectionStatus.Loading -> {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                Text("Проверяем...")
+                            }
+                        }
+
+                        is ConnectionStatus.Connected -> {
+                            Text(
+                                text = "Подключено. Время сервера: ${status.time}",
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+
+                        is ConnectionStatus.Error -> {
+                            Text(
+                                text = "Ошибка: ${status.message}",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+
                     if (state.isDirty) {
-                        Text(text = "Есть несохранённые изменения", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            text = "Есть несохранённые изменения",
+                            color = MaterialTheme.colorScheme.tertiary,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
@@ -294,12 +363,14 @@ private fun SwitchRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = title, style = MaterialTheme.typography.bodyLarge)
+
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
@@ -311,21 +382,36 @@ private fun CounterCell(
     onDecrement: () -> Unit,
     onIncrement: () -> Unit
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
         Text(text = label, style = MaterialTheme.typography.labelMedium)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OutlinedButton(onClick = onDecrement) { Text("−") }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedButton(onClick = onDecrement) {
+                Text("-")
+            }
+
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.width(64.dp),
+                modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center
             )
-            OutlinedButton(onClick = onIncrement) { Text("+") }
+
+            OutlinedButton(onClick = onIncrement) {
+                Text("+")
+            }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BackupItem(
     backup: BackupInfo,
@@ -333,28 +419,38 @@ private fun BackupItem(
     onDelete: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
+        Column(
             modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Text(text = backup.formattedDate(), style = MaterialTheme.typography.bodyMedium)
+
                 Text(
                     text = backup.formattedSize(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onRestore) { Text("Восстановить") }
-                OutlinedButton(onClick = onDelete) { Text("Удалить") }
+
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onRestore) {
+                    Text("Восстановить", maxLines = 1)
+                }
+
+                OutlinedButton(onClick = onDelete) {
+                    Text("Удалить", maxLines = 1)
+                }
             }
         }
     }
 }
 
-private fun syncSummary(isSyncing: Boolean, pendingCount: Int, lastSyncAt: Long?): String = when {
+private fun syncSummary(
+    isSyncing: Boolean,
+    pendingCount: Int,
+    lastSyncAt: Long?
+): String = when {
     isSyncing -> "Синхронизируем прогресс..."
     pendingCount > 0 -> "Есть несохранённые изменения. Синхронизируем автоматически, когда появится сеть."
     lastSyncAt != null -> "Прогресс синхронизирован (${formatTimestamp(lastSyncAt)})."
@@ -363,9 +459,13 @@ private fun syncSummary(isSyncing: Boolean, pendingCount: Int, lastSyncAt: Long?
 
 private fun formatTimestamp(value: Long?): String {
     if (value == null) return "-"
+
     return try {
-        Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault())
-            .toLocalDateTime().format(DateTimeFormatter.ofPattern("dd.MM HH:mm"))
+        Instant
+            .ofEpochMilli(value)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDateTime()
+            .format(DateTimeFormatter.ofPattern("dd.MM HH:mm"))
     } catch (_: Throwable) {
         "-"
     }
