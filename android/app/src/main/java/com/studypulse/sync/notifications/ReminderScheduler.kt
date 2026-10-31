@@ -3,7 +3,6 @@ package com.studypulse.sync.notifications
 import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -35,11 +34,12 @@ class ReminderScheduler(
         slots.forEach { swt ->
             val slot = swt.slot
             if (slot.status != "PLANNED") return@forEach
+
             val triggerAt = slot.startDateTime - 15 * 60 * 1000
             val delay = triggerAt - now
             if (delay <= 0) return@forEach
 
-            val request: OneTimeWorkRequest = OneTimeWorkRequestBuilder<SlotReminderWorker>()
+            val request = OneTimeWorkRequestBuilder<SlotReminderWorker>()
                 .setInitialDelay(delay, TimeUnit.MILLISECONDS)
                 .setInputData(workDataOf("slotId" to slot.id))
                 .build()
@@ -67,12 +67,14 @@ class ReminderScheduler(
                 val delay = triggerAt - now
                 if (delay <= 0) return@forEach
 
-                val request: OneTimeWorkRequest = OneTimeWorkRequestBuilder<DeadlineReminderWorker>()
+                val request = OneTimeWorkRequestBuilder<DeadlineReminderWorker>()
                     .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-                    .setInputData(workDataOf(
-                        "taskId" to task.externalId,
-                        "hoursBefore" to hoursBefore
-                    ))
+                    .setInputData(
+                        workDataOf(
+                            "taskId" to task.externalId,
+                            "hoursBefore" to hoursBefore
+                        )
+                    )
                     .build()
 
                 wm.enqueueUniqueWork(
@@ -84,8 +86,9 @@ class ReminderScheduler(
         }
     }
 
-    fun scheduleMorningDigest() {
+    suspend fun scheduleMorningDigest() {
         val profile = container.profileRepository.currentProfile()
+
         if (!profile.notificationsEnabled || !profile.morningDigestEnabled) {
             wm.cancelUniqueWork(MORNING_DIGEST_WORK)
             return
