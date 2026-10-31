@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -37,9 +37,11 @@ fun ScheduleImportScreen(
     viewModel: ScheduleImportViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         OutlinedButton(onClick = onExit) { Text("Назад") }
@@ -50,18 +52,18 @@ fun ScheduleImportScreen(
                     text = "Импорт расписания из текста",
                     style = MaterialTheme.typography.titleMedium
                 )
-
                 Text(
                     text = "Вставьте текст расписания. Приложение попытается распознать дни недели, время, предмет, тип, аудиторию и преподавателя.",
                     style = MaterialTheme.typography.bodyMedium
                 )
-
                 Text(
-                    text = "Пример:\nПонедельник\n10:00-11:30 Физика, лекция, ауд 204, Иванов А.П.\n14:00-15:30 История, семинар, ауд 312",
+                    text = """Пример:
+Понедельник
+10:00-11:30 Физика, лекция, ауд 204, Иванов А.П.
+14:00-15:30 История, семинар, ауд 312""",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-
                 OutlinedTextField(
                     value = state.inputText,
                     onValueChange = viewModel::onInputChange,
@@ -70,7 +72,6 @@ fun ScheduleImportScreen(
                     maxLines = 12,
                     modifier = Modifier.fillMaxWidth()
                 )
-
                 Button(
                     onClick = viewModel::parse,
                     enabled = !state.isParsing && state.inputText.isNotBlank()
@@ -93,7 +94,6 @@ fun ScheduleImportScreen(
                         text = "Распознано занятий: ${state.lessons.size}",
                         style = MaterialTheme.typography.titleSmall
                     )
-
                     Text(
                         text = "Проверьте поля и подтвердите импорт.",
                         style = MaterialTheme.typography.bodySmall,
@@ -102,15 +102,14 @@ fun ScheduleImportScreen(
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
+            Column(
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                itemsIndexed(state.lessons, key = { index, _ -> index }) { index, lesson ->
+                state.lessons.forEachIndexed { index, lesson ->
                     LessonRow(
                         lesson = lesson,
                         onToggle = { viewModel.toggleLesson(index) },
-                        // ИСПРАВЛЕНО: явно передаём новый объект lesson
                         onUpdate = { newLesson -> viewModel.updateLesson(index, newLesson) }
                     )
                 }
@@ -156,7 +155,6 @@ private fun LessonRow(
                     }
                 )
             }
-
             OutlinedTextField(
                 value = lesson.subjectName,
                 onValueChange = { onUpdate(lesson.copy(subjectName = it)) },
@@ -164,7 +162,6 @@ private fun LessonRow(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-
             OutlinedTextField(
                 value = lesson.lessonType,
                 onValueChange = { onUpdate(lesson.copy(lessonType = it)) },
@@ -172,7 +169,6 @@ private fun LessonRow(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-
             Text(text = "День недели", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 weekdays.forEach { (value, label) ->
@@ -183,7 +179,6 @@ private fun LessonRow(
                     }
                 }
             }
-
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = lesson.startTime,
@@ -200,7 +195,6 @@ private fun LessonRow(
                     modifier = Modifier.weight(1f)
                 )
             }
-
             OutlinedTextField(
                 value = lesson.room,
                 onValueChange = { onUpdate(lesson.copy(room = it)) },
@@ -208,7 +202,6 @@ private fun LessonRow(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-
             OutlinedTextField(
                 value = lesson.teacher,
                 onValueChange = { onUpdate(lesson.copy(teacher = it)) },
@@ -216,7 +209,6 @@ private fun LessonRow(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-
             Text(text = "Чётность", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 parities.forEach { (value, label) ->
