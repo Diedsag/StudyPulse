@@ -38,6 +38,11 @@ fun ScheduleImportScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+        val importItemCount = runCatching { (state.lessons as? Collection<*>)?.size ?: 0 }.getOrDefault(0)
+        ScheduleImportConfirmAction(
+            itemCount = importItemCount,
+            onConfirm = { viewModel.import() }
+        )
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -226,6 +231,26 @@ private fun LessonRow(
                         OutlinedButton(onClick = { onUpdate(lesson.copy(parity = value)) }) { Text(label) }
                     }
                 }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun ScheduleImportConfirmAction(
+    itemCount: Int,
+    onConfirm: () -> Unit
+) {
+    if (itemCount > 0) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Button(onClick = onConfirm) {
+                Text("Подтвердить импорт ($itemCount)")
             }
         }
     }
