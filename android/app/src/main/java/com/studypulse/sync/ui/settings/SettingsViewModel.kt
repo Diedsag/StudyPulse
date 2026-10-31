@@ -45,7 +45,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     init {
         viewModelScope.launch {
-            settingsRepository.observeSettings().collect { s ->
+            try {
+                val s = settingsRepository.currentSettings()
                 _uiState.update {
                     it.copy(
                         serverUrl = s.serverUrl,
@@ -54,8 +55,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         ratingOptIn = s.ratingOptIn
                     )
                 }
+            } catch (_: Throwable) {
+                // ignore, defaults stay
             }
         }
+
         viewModelScope.launch {
             profileRepository.profile.collect { p ->
                 _uiState.update {
