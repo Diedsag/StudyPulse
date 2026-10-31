@@ -1,4 +1,5 @@
 package com.studypulse.sync.ui.qa
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -59,7 +60,7 @@ class QaViewModel(
                 }
                 return@launch
             }
-            // Ключевой фикс 4.6: гарантируем, что чанки существуют до первого вопроса.
+            // Ключевой фикс 4.6: чанки обязаны существовать до первого вопроса.
             runCatching { qaService.chunkMaterial(material) }
             _uiState.update { currentState ->
                 currentState.copy(

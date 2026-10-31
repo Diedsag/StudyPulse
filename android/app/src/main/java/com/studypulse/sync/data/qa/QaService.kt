@@ -1,4 +1,5 @@
 package com.studypulse.sync.data.qa
+
 import com.studypulse.sync.data.local.AppDatabase
 import com.studypulse.sync.data.local.entity.MaterialChunkEntity
 import com.studypulse.sync.data.local.entity.MaterialEntity
@@ -78,13 +79,48 @@ class QaService(
         allowGeneral: Boolean = false
     ): Result<QaAnswer> {
         return try {
-            val normalizedQuestion = question.trim().lowercase()
-            if (normalizedQuestion.isBlank()) {
+            val rawQuestion = question.trim()
+            if (rawQuestion.isBlank()) {
                 return Result.failure(IllegalArgumentException("Вопрос не может быть пустым"))
             }
+            val normalizedQuestion = rawQuestion.lowercase()
             val keywords = extractKeywords(normalizedQuestion)
-            val chunks = collectChunks(materialExternalId, keywords, normalizedQuestion)
-            if (chunks.isEmpty()) {
+
+            val terms = LinkedHashSet<String>()
+            terms.addAll(keywords)
+            terms.add(normalizedQuestion)
+
+            val allMaterialIds: List<String>? = if (materialExternalId == null) {
+                materialDao.getAllActiveOnce().map { it.externalId }
+            } else null
+
+            val scoreMap = LinkedHashMap<String, Pair<MaterialChunkEntity, Int>>()
+
+            for (term in terms) {
+                if (term.isBlank()) continue
+                val isWholeQuestion = term == normalizedQuestion
+                for (variant in caseVariants(term)) {
+                    val found = if (materialExternalId != null) {
+                        chunkDao.searchByKeyword(materialExternalId, variant)
+                    } else {
+                        chunkDao.searchByKeywordInMaterials(allMaterialIds ?: emptyList(), variant)
+                    }
+                    for (chunk in found) {
+                        val key = "${chunk.materialExternalId}#${chunk.orderIndex}"
+                        val addScore = if (isWholeQuestion) 1 else 2
+                        val existing = scoreMap[key]
+                        scoreMap[key] = if (existing == null) {
+                            Pair(chunk, addScore)
+                        } else {
+                            Pair(existing.first, existing.second + addScore)
+                        }
+                    }
+                }
+            }
+
+            val ranked = scoreMap.values.sortedByDescending { it.second }.map { it.first }
+
+            if (ranked.isEmpty()) {
                 return Result.success(
                     QaAnswer(
                         text = "В ваших материалах этого нет.",
@@ -94,7 +130,8 @@ class QaService(
                     )
                 )
             }
-            val topChunks = chunks.take(3)
+
+            val topChunks = ranked.take(3)
             val materialMap = materialDao.getAllActiveOnce().associateBy { it.externalId }
             val citations = topChunks.map { chunk ->
                 val material = materialMap[chunk.materialExternalId]
@@ -106,7 +143,7 @@ class QaService(
                     quotedText = chunk.text
                 )
             }
-            val answerText = buildAnswer(topChunks, question)
+            val answerText = buildAnswer(topChunks, rawQuestion)
             Result.success(
                 QaAnswer(
                     text = answerText,
@@ -120,36 +157,10 @@ class QaService(
         }
     }
 
-    private suspend fun collectChunks(
-        materialExternalId: String?,
-        keywords: List<String>,
-        normalizedQuestion: String
-    ): List<MaterialChunkEntity> {
-        val seen = HashSet<String>()
-        val result = ArrayList<MaterialChunkEntity>()
-        val terms = ArrayList<String>()
-        terms.addAll(keywords)
-        if (normalizedQuestion.isNotBlank() && normalizedQuestion !in terms) {
-            terms.add(normalizedQuestion)
-        }
-        val allMaterialIds: List<String>? = if (materialExternalId == null) {
-            materialDao.getAllActiveOnce().map { it.externalId }
-        } else null
-        for (term in terms) {
-            if (term.isBlank()) continue
-            val found = if (materialExternalId != null) {
-                chunkDao.searchByKeyword(materialExternalId, term)
-            } else {
-                chunkDao.searchByKeywordInMaterials(allMaterialIds ?: emptyList(), term)
-            }
-            for (c in found) {
-                val key = "${c.materialExternalId}#${c.orderIndex}"
-                if (seen.add(key)) {
-                    result.add(c)
-                }
-            }
-        }
-        return result
+    private fun caseVariants(word: String): List<String> {
+        val cap = word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        val upper = word.uppercase()
+        return listOf(word, cap, upper).distinct()
     }
 
     fun answerGeneral(question: String): QaAnswer {
@@ -164,17 +175,18 @@ class QaService(
 
     private fun extractKeywords(text: String): List<String> {
         val stopWords = setOf(
-            "что", "как", "где", "когда", "почему", "зачем", "какой", "какая", "какие",
-            "это", "есть", "быть", "был", "была", "были", "будет",
+            "что", "как", "где", "когда", "почему", "зачем", "какой", "какая", "какие", "каком", "какой",
+            "это", "есть", "быть", "был", "была", "были", "будет", "мне", "можно", "расскажи", "объясни",
+            "пожалуйста", "ли", "же", "бы", "ну", "вот", "там", "тут", "все", "всё", "сам", "сама",
             "и", "или", "но", "а", "в", "на", "по", "с", "со", "к", "ко", "о", "об", "обо",
             "из", "от", "до", "за", "перед", "над", "под", "про", "через",
             "для", "при", "после", "между", "среди"
         )
         val words = text.split(Regex("\\s+"))
             .map { it.lowercase().replace(Regex("[^а-яa-z0-9]"), "") }
-            .filter { it.length > 1 && it !in stopWords }
+            .filter { it.length >= 2 && it !in stopWords }
             .distinct()
-        return words.take(5)
+        return words.take(6)
     }
 
     private fun buildAnswer(chunks: List<MaterialChunkEntity>, question: String): String {

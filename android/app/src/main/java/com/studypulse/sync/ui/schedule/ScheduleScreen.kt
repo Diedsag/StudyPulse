@@ -1,4 +1,5 @@
 package com.studypulse.sync.ui.schedule
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -78,13 +79,15 @@ fun ScheduleScreen(
                         }
                     }
                 }
-                state.occurrences.forEach { occurrence ->
-                    OccurrenceCard(
-                        occurrence = occurrence,
-                        onCancel = { viewModel.cancelOccurrence(occurrence) },
-                        onEdit = { viewModel.startEdit(occurrence) },
-                        onDelete = { viewModel.deleteTemplate(occurrence) }
-                    )
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    state.occurrences.forEach { occurrence ->
+                        OccurrenceCard(
+                            occurrence = occurrence,
+                            onCancel = { viewModel.cancelOccurrence(occurrence) },
+                            onEdit = { viewModel.startEdit(occurrence) },
+                            onDelete = { viewModel.deleteTemplate(occurrence) }
+                        )
+                    }
                 }
             }
         }
@@ -147,7 +150,7 @@ private fun OccurrenceCard(occurrence: ClassOccurrence, onCancel: () -> Unit, on
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = occurrence.weekday, style = MaterialTheme.typography.bodySmall)
             }
-            Text(text = "${occurrence.startTime}\u2013${occurrence.endTime}", style = MaterialTheme.typography.titleMedium)
+            Text(text = "${occurrence.startTime}–${occurrence.endTime}", style = MaterialTheme.typography.titleMedium)
             Text(text = occurrence.subject, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
             occurrence.lessonType?.let { Text(text = "Тип: $it", style = MaterialTheme.typography.bodyMedium) }
             occurrence.room?.let { Text(text = "Аудитория: $it", style = MaterialTheme.typography.bodyMedium) }
