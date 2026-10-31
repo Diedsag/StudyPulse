@@ -8,12 +8,16 @@ import com.studypulse.sync.data.local.dao.CardDao
 import com.studypulse.sync.data.local.dao.ClassInstanceDao
 import com.studypulse.sync.data.local.dao.MaterialDao
 import com.studypulse.sync.data.local.dao.PackageDao
+import com.studypulse.sync.data.local.dao.PendingEventDao
+import com.studypulse.sync.data.local.dao.ReviewLogDao
 import com.studypulse.sync.data.local.dao.ScheduleDao
 import com.studypulse.sync.data.local.dao.StudySlotDao
 import com.studypulse.sync.data.local.dao.TaskDao
 import com.studypulse.sync.data.local.entity.CardEntity
 import com.studypulse.sync.data.local.entity.ClassInstanceEntity
 import com.studypulse.sync.data.local.entity.MaterialEntity
+import com.studypulse.sync.data.local.entity.PendingEventEntity
+import com.studypulse.sync.data.local.entity.ReviewLogEntity
 import com.studypulse.sync.data.local.entity.ScheduleItemEntity
 import com.studypulse.sync.data.local.entity.StudyPackageEntity
 import com.studypulse.sync.data.local.entity.StudySlotEntity
@@ -27,9 +31,11 @@ import com.studypulse.sync.data.local.entity.TaskEntity
         MaterialEntity::class,
         CardEntity::class,
         ClassInstanceEntity::class,
-        StudySlotEntity::class
+        StudySlotEntity::class,
+        ReviewLogEntity::class,
+        PendingEventEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -41,6 +47,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun cardDao(): CardDao
     abstract fun classInstanceDao(): ClassInstanceDao
     abstract fun studySlotDao(): StudySlotDao
+    abstract fun reviewLogDao(): ReviewLogDao
+    abstract fun pendingEventDao(): PendingEventDao
 
     companion object {
 

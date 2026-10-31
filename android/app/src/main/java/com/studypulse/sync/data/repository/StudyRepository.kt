@@ -3,17 +3,25 @@ package com.studypulse.sync.data.repository
 import androidx.room.withTransaction
 import com.studypulse.sync.data.local.AppDatabase
 import com.studypulse.sync.data.local.dao.SlotWithTask
+import com.studypulse.sync.data.local.entity.CardEntity
 import com.studypulse.sync.data.local.entity.ClassInstanceEntity
+import com.studypulse.sync.data.local.entity.MaterialEntity
+import com.studypulse.sync.data.local.entity.PendingEventEntity
+import com.studypulse.sync.data.local.entity.ReviewLogEntity
 import com.studypulse.sync.data.local.entity.ScheduleItemEntity
 import com.studypulse.sync.data.local.entity.StudySlotEntity
 import com.studypulse.sync.data.local.entity.TaskEntity
+import com.studypulse.sync.data.srs.SpacedRepetitionScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 data class ClassOccurrence(
     val templateExternalId: String,
@@ -39,6 +47,11 @@ data class PlanGenerationResult(
     val warnings: List<String>
 )
 
+data class ReviewOutcome(
+    val nextDueAt: Long,
+    val intervalDays: Int
+)
+
 class StudyRepository(
     private val database: AppDatabase
 ) {
@@ -47,9 +60,16 @@ class StudyRepository(
     private val taskDao = database.taskDao()
     private val classInstanceDao = database.classInstanceDao()
     private val studySlotDao = database.studySlotDao()
+    private val materialDao = database.materialDao()
+    private val cardDao = database.cardDao()
+    private val reviewLogDao = database.reviewLogDao()
+    private val pendingEventDao = database.pendingEventDao()
 
     val tasks: Flow<List<TaskEntity>> =
         taskDao.observeDownloaded()
+
+    val materials: Flow<List<MaterialEntity>> =
+        materialDao.observeDownloaded()
 
     val proposedSlots: Flow<List<SlotWithTask>> =
         studySlotDao.observeWithTask("PROPOSED")
@@ -82,6 +102,84 @@ class StudyRepository(
                 updatedAt = System.currentTimeMillis()
             )
         )
+    }
+
+    suspend fun getDueCards(
+        materialExternalId: String?
+    ): Result<List<CardEntity>> {
+        return try {
+            val now = System.currentTimeMillis()
+
+            val cards = if (materialExternalId.isNullOrBlank()) {
+                cardDao.getDueAllOnce(now)
+            } else {
+                cardDao.getDueByMaterialOnce(materialExternalId, now)
+            }
+
+            Result.success(cards)
+        } catch (e: Throwable) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun reviewCard(
+        card: CardEntity,
+        rating: Int
+    ): Result<ReviewOutcome> {
+        return try {
+            val now = System.currentTimeMillis()
+            val updatedCard = SpacedRepetitionScheduler.review(card, rating, now)
+            val clientEventId = UUID.randomUUID().toString()
+
+            val payloadJson = buildJsonObject {
+                put("package_external_id", card.packageExternalId)
+                put("card_external_id", card.externalId)
+                put("rating", rating)
+                put("previous_interval_days", card.intervalDays)
+                put("new_interval_days", updatedCard.intervalDays)
+            }.toString()
+
+            database.withTransaction {
+                cardDao.update(updatedCard)
+
+                reviewLogDao.insert(
+                    ReviewLogEntity(
+                        clientEventId = clientEventId,
+                        cardExternalId = card.externalId,
+                        packageExternalId = card.packageExternalId,
+                        rating = rating,
+                        reviewedAt = now,
+                        previousIntervalDays = card.intervalDays,
+                        newIntervalDays = updatedCard.intervalDays,
+                        previousEaseFactor = card.easeFactor,
+                        newEaseFactor = updatedCard.easeFactor,
+                        synced = false
+                    )
+                )
+
+                pendingEventDao.insert(
+                    PendingEventEntity(
+                        clientEventId = clientEventId,
+                        eventType = "CARD_REVIEWED",
+                        payloadJson = payloadJson,
+                        occurredAt = now,
+                        createdAt = now,
+                        retryCount = 0,
+                        lastError = null,
+                        synced = false
+                    )
+                )
+            }
+
+            Result.success(
+                ReviewOutcome(
+                    nextDueAt = updatedCard.dueAt,
+                    intervalDays = updatedCard.intervalDays
+                )
+            )
+        } catch (e: Throwable) {
+            Result.failure(e)
+        }
     }
 
     suspend fun generatePlan(): Result<PlanGenerationResult> {
@@ -261,9 +359,8 @@ class StudyRepository(
                 val allocatedMinutes = proposedSlots
                     .filter { it.taskExternalId == task.externalId }
                     .sumOf { slot ->
-                        ((slot.endDateTime - slot.startDateTime) / 60_000L).toInt().toLong()
+                        ((slot.endDateTime - slot.startDateTime) / 60_000L).toInt()
                     }
-                    .toInt()
 
                 val shortage = task.remainingMinutes - allocatedMinutes
 

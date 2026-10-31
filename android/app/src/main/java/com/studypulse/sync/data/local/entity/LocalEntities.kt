@@ -155,3 +155,52 @@ data class StudySlotEntity(
     val materialExternalId: String? = null,
     val createdAt: Long
 )
+
+@Entity(
+    tableName = "review_logs",
+    indices = [
+        Index("cardExternalId"),
+        Index("reviewedAt"),
+        Index("synced")
+    ]
+)
+data class ReviewLogEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
+    val clientEventId: String,
+    val cardExternalId: String,
+    val packageExternalId: String,
+
+    val rating: Int,
+    val reviewedAt: Long,
+
+    val previousIntervalDays: Int,
+    val newIntervalDays: Int,
+    val previousEaseFactor: Double,
+    val newEaseFactor: Double,
+
+    val synced: Boolean = false
+)
+
+@Entity(
+    tableName = "pending_events",
+    indices = [
+        Index("synced"),
+        Index("eventType")
+    ]
+)
+data class PendingEventEntity(
+    @PrimaryKey
+    val clientEventId: String,
+
+    val eventType: String,
+    val payloadJson: String,
+
+    val occurredAt: Long,
+    val createdAt: Long,
+
+    val retryCount: Int = 0,
+    val lastError: String? = null,
+    val synced: Boolean = false
+)

@@ -5,9 +5,12 @@ import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.studypulse.sync.data.local.entity.CardEntity
 import com.studypulse.sync.data.local.entity.ClassInstanceEntity
 import com.studypulse.sync.data.local.entity.MaterialEntity
+import com.studypulse.sync.data.local.entity.PendingEventEntity
+import com.studypulse.sync.data.local.entity.ReviewLogEntity
 import com.studypulse.sync.data.local.entity.ScheduleItemEntity
 import com.studypulse.sync.data.local.entity.StudyPackageEntity
 import com.studypulse.sync.data.local.entity.StudySlotEntity
@@ -106,6 +109,14 @@ interface TaskDao {
 @Dao
 interface MaterialDao {
 
+    @Query(
+        "SELECT m.* FROM materials m " +
+            "INNER JOIN packages p ON m.packageExternalId = p.externalId " +
+            "WHERE p.isDownloaded = 1 " +
+            "ORDER BY m.title COLLATE NOCASE ASC"
+    )
+    fun observeDownloaded(): Flow<List<MaterialEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<MaterialEntity>)
 
@@ -116,8 +127,29 @@ interface MaterialDao {
 @Dao
 interface CardDao {
 
+    @Query(
+        "SELECT * FROM cards " +
+            "WHERE materialExternalId = :materialExternalId " +
+                "AND dueAt <= :now " +
+            "ORDER BY position ASC"
+    )
+    suspend fun getDueByMaterialOnce(
+        materialExternalId: String,
+        now: Long
+    ): List<CardEntity>
+
+    @Query(
+        "SELECT * FROM cards " +
+            "WHERE dueAt <= :now " +
+            "ORDER BY packageExternalId ASC, position ASC"
+    )
+    suspend fun getDueAllOnce(now: Long): List<CardEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<CardEntity>)
+
+    @Update
+    suspend fun update(card: CardEntity)
 
     @Query("DELETE FROM cards WHERE packageExternalId = :packageExternalId")
     suspend fun deleteByPackage(packageExternalId: String)
@@ -177,4 +209,21 @@ interface StudySlotDao {
 
     @Query("SELECT * FROM study_slots WHERE status = :status")
     suspend fun getAllByStatus(status: String): List<StudySlotEntity>
+}
+
+@Dao
+interface ReviewLogDao {
+
+    @Insert
+    suspend fun insert(item: ReviewLogEntity)
+}
+
+@Dao
+interface PendingEventDao {
+
+    @Insert
+    suspend fun insert(item: PendingEventEntity)
+
+    @Query("SELECT COUNT(*) FROM pending_events WHERE synced = 0")
+    fun observeUnsyncedCount(): Flow<Int>
 }
